@@ -17,15 +17,22 @@ export function ThemeToggle({ className }: { className?: string }) {
 
     if (shouldBeDark) {
       document.documentElement.classList.add('dark');
+      if (document.body) document.body.classList.add('dark');
       setIsDark(true);
     } else {
       document.documentElement.classList.remove('dark');
+      if (document.body) document.body.classList.remove('dark');
       setIsDark(false);
     }
 
     // Keep sync if class changes externally
     const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
+      const darkActive = document.documentElement.classList.contains('dark');
+      setIsDark(darkActive);
+      if (document.body) {
+        if (darkActive) document.body.classList.add('dark');
+        else document.body.classList.remove('dark');
+      }
     });
     observer.observe(document.documentElement, {
       attributes: true,
@@ -40,10 +47,12 @@ export function ThemeToggle({ className }: { className?: string }) {
     const willBeDark = !root.classList.contains('dark');
     if (willBeDark) {
       root.classList.add('dark');
+      if (document.body) document.body.classList.add('dark');
       localStorage.setItem('theme', 'dark');
       setIsDark(true);
     } else {
       root.classList.remove('dark');
+      if (document.body) document.body.classList.remove('dark');
       localStorage.setItem('theme', 'light');
       setIsDark(false);
     }
