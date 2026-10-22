@@ -156,6 +156,7 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       price_type: eventData.price_type || 'fixed',
       price_amount: eventData.price_amount ?? 0,
       prefix_code: (eventData.prefix_code || 'EVT').toUpperCase().slice(0, 5),
+      contact_config: eventData.contact_config,
       form_schema: eventData.form_schema || [],
       wa_template: eventData.wa_template || 'Halo Admin, saya telah mendaftar di *{event}*.\n\nKode Pendaftaran: *{kode}*\nNama: *{nama}*\nTotal Bayar: *Rp {total}*\nBukti: {bukti}',
       success_message: eventData.success_message || 'Terima kasih telah mendaftar! Mohon segera konfirmasi pembayaran melalui WhatsApp.',

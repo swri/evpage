@@ -64,6 +64,19 @@ export interface OrganizationSettings {
   updated_at?: string;
 }
 
+export interface EventContactConfig {
+  title?: string;
+  description?: string;
+  name_label?: string;
+  name_placeholder?: string;
+  phone_label?: string;
+  phone_placeholder?: string;
+  phone_helper?: string;
+  email_label?: string;
+  email_placeholder?: string;
+  email_required?: boolean;
+}
+
 export interface EventItem {
   id: string;
   slug: string;
@@ -77,6 +90,7 @@ export interface EventItem {
   price_type: PriceType;
   price_amount: number;
   prefix_code: string;
+  contact_config?: EventContactConfig;
   form_schema: FormField[];
   wa_template: string;
   success_message: string;

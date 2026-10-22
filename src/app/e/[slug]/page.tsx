@@ -186,18 +186,23 @@ function EventRegistrationContent({
     const newErrors: Record<string, string> = {};
 
     // Primary Contact Validation
+    const nameLbl = event.contact_config?.name_label || 'Nama kontak';
+    const phoneLbl = event.contact_config?.phone_label || 'Nomor WhatsApp';
+    const emailLbl = event.contact_config?.email_label || 'Email';
+    const isEmailReq = event.contact_config?.email_required ?? true;
+
     if (!contactName.trim()) {
-      newErrors['contact_name'] = 'Nama kontak wajib diisi.';
+      newErrors['contact_name'] = `${nameLbl} wajib diisi.`;
     }
     if (!contactPhone.trim()) {
-      newErrors['contact_phone'] = 'Nomor WhatsApp wajib diisi.';
+      newErrors['contact_phone'] = `${phoneLbl} wajib diisi.`;
     } else if (!/^[0-9+\-\s]{8,16}$/.test(contactPhone.trim())) {
-      newErrors['contact_phone'] = 'Format nomor WhatsApp tidak valid.';
+      newErrors['contact_phone'] = `Format ${phoneLbl} tidak valid.`;
     }
-    if (!contactEmail.trim()) {
-      newErrors['contact_email'] = 'Email wajib diisi.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
-      newErrors['contact_email'] = 'Format email tidak valid.';
+    if (isEmailReq && !contactEmail.trim()) {
+      newErrors['contact_email'] = `${emailLbl} wajib diisi.`;
+    } else if (contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      newErrors['contact_email'] = `Format ${emailLbl} tidak valid.`;
     }
 
     // Dynamic Fields Validation
@@ -604,23 +609,24 @@ function EventRegistrationContent({
                 <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
                   <div className="mb-4 border-b border-neutral-200 pb-3 dark:border-neutral-800">
                     <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
-                      1. Informasi Kontak Penanggung Jawab
+                      {event.contact_config?.title || '1. Informasi Kontak Penanggung Jawab'}
                     </h2>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                      Digunakan untuk verifikasi, konfirmasi WhatsApp, dan pengecekan status tiket.
+                      {event.contact_config?.description ||
+                        'Digunakan untuk verifikasi, konfirmasi WhatsApp, dan pengecekan status tiket.'}
                     </p>
                   </div>
 
                   <div className="space-y-4">
                     <div>
                       <label htmlFor="contact_name" className="block text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                        Nama Lengkap <span className="text-red-500 font-semibold">*</span>
+                        {event.contact_config?.name_label || 'Nama Lengkap'} <span className="text-red-500 font-semibold">*</span>
                       </label>
                       <Input
                         id="contact_name"
                         type="text"
                         autoComplete="name"
-                        placeholder="Contoh: Budi Pratama"
+                        placeholder={event.contact_config?.name_placeholder || 'Contoh: Budi Pratama'}
                         value={contactName}
                         onChange={(e) => setContactName(e.target.value)}
                         className="mt-1"
@@ -633,20 +639,20 @@ function EventRegistrationContent({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label htmlFor="contact_phone" className="block text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                          Nomor WhatsApp <span className="text-red-500 font-semibold">*</span>
+                          {event.contact_config?.phone_label || 'Nomor WhatsApp'} <span className="text-red-500 font-semibold">*</span>
                         </label>
                         <Input
                           id="contact_phone"
                           type="tel"
                           inputMode="tel"
                           autoComplete="tel"
-                          placeholder="0812xxxxxxxx"
+                          placeholder={event.contact_config?.phone_placeholder || '0812xxxxxxxx'}
                           value={contactPhone}
                           onChange={(e) => setContactPhone(e.target.value)}
                           className="mt-1"
                         />
                         <p className="text-[11px] text-neutral-400 mt-1">
-                          Nomor ini juga digunakan untuk login cek status.
+                          {event.contact_config?.phone_helper || 'Nomor ini juga digunakan untuk login cek status.'}
                         </p>
                         {errors.contact_phone && (
                           <p className="text-xs text-red-600 mt-1">{errors.contact_phone}</p>
@@ -655,14 +661,17 @@ function EventRegistrationContent({
 
                       <div>
                         <label htmlFor="contact_email" className="block text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                          Email Aktif <span className="text-red-500 font-semibold">*</span>
+                          {event.contact_config?.email_label || 'Email Aktif'}{' '}
+                          {(event.contact_config?.email_required ?? true) && (
+                            <span className="text-red-500 font-semibold">*</span>
+                          )}
                         </label>
                         <Input
                           id="contact_email"
                           type="email"
                           inputMode="email"
                           autoComplete="email"
-                          placeholder="nama@email.com"
+                          placeholder={event.contact_config?.email_placeholder || 'nama@email.com'}
                           value={contactEmail}
                           onChange={(e) => setContactEmail(e.target.value)}
                           className="mt-1"
