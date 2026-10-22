@@ -220,7 +220,7 @@ export const BUILT_IN_TEMPLATES: { id: string; name: string; description: string
 
 export const INITIAL_ORGANIZATION_SETTINGS: OrganizationSettings = {
   name: 'Arena Sport & Event Center',
-  logo_url: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=160&auto=format&fit=crop&q=80',
+  logo_url: '/icon.svg',
   accent_color: '#0f172a',
   wa_number: '6281234567890',
   payment_info: {

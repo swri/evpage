@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { AppLogo } from '@/components/ui/app-logo';
 import { useToast } from '@/components/ui/toast-context';
 import {
   Calendar,
@@ -327,15 +328,11 @@ function EventRegistrationContent({
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fafaf9] dark:bg-[#09090b]">
-      {/* Header */}
+      {/* Header with Monochrome EVP Logo */}
       <header className="sticky top-0 z-40 w-full border-b border-neutral-200/80 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-900/80">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Kembali ke Beranda</span>
+          <Link href="/" className="hover:opacity-90 transition-opacity">
+            <AppLogo size="sm" subtitle={orgSettings?.name || 'Event Platform'} />
           </Link>
 
           <div className="flex items-center gap-3">

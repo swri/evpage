@@ -7,6 +7,7 @@ import { EventItem, OrganizationSettings } from '@/types';
 import { Calendar, MapPin, Users, ArrowRight, ShieldCheck, Search, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { AppLogo } from '@/components/ui/app-logo';
 
 export default function HomePage() {
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -38,14 +39,9 @@ export default function HomePage() {
       {/* Top Navigation */}
       <header className="sticky top-0 z-40 w-full border-b border-neutral-200/80 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-900/80">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-900 text-white font-bold text-sm dark:bg-white dark:text-neutral-900 shadow-xs">
-              E
-            </div>
-            <div className="font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight">
-              {settings?.name || 'EvPage'}
-            </div>
-          </div>
+          <Link href="/" className="hover:opacity-90 transition-opacity">
+            <AppLogo size="sm" subtitle={settings?.name || 'Event Platform'} />
+          </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
             <Link

@@ -7,6 +7,7 @@ import { getCurrentAdminSession, logoutAdmin } from '@/lib/auth';
 import { getOrganizationSettings } from '@/lib/store';
 import { OrganizationSettings } from '@/types';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { AppLogo } from '@/components/ui/app-logo';
 import {
   LayoutDashboard,
   CalendarDays,
@@ -99,17 +100,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex bg-[#fafaf9] dark:bg-[#09090b]">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-900 shrink-0">
-        {/* Brand / Org Header */}
-        <div className="p-4 border-b border-neutral-200/80 dark:border-neutral-800 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-900 text-white font-bold text-sm dark:bg-white dark:text-neutral-900 shadow-xs">
-            <Layers className="h-5 w-5" />
-          </div>
-          <div className="overflow-hidden">
-            <div className="font-bold text-sm text-neutral-900 dark:text-neutral-100 truncate">
-              {orgSettings?.name || 'EvPage Admin'}
-            </div>
-            <div className="text-[11px] text-neutral-400 truncate">Portal Penyelenggara</div>
-          </div>
+        {/* Brand / Org Header with Monochrome EVP Logo */}
+        <div className="p-4 border-b border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between">
+          <Link href="/admin" className="hover:opacity-90 transition-opacity">
+            <AppLogo size="sm" subtitle={orgSettings?.name || 'Admin Portal'} />
+          </Link>
         </div>
 
         {/* Navigation Links */}
@@ -194,9 +189,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             >
               {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
-            <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
-              {orgSettings?.name || 'EvPage Admin'}
-            </span>
+            <AppLogo size="sm" subtitle="Admin" />
           </div>
 
           <div className="flex items-center gap-2">

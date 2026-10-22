@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast-context';
+import { AppLogo } from '@/components/ui/app-logo';
 import {
   Save,
   Building,
@@ -156,17 +157,43 @@ export default function AdminSettingsPage() {
               <span className="text-[11px] text-neutral-400">Format internasional: 628xxxxxxxx</span>
             </div>
 
-            <div className="sm:col-span-2">
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                URL Logo Organisasi
-              </label>
-              <Input
-                type="url"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://example.com/logo.png"
-                className="text-xs h-9"
-              />
+            <div className="sm:col-span-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                  Logo Aplikasi / Organisasi
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setLogoUrl('/icon.svg')}
+                  className="text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white underline cursor-pointer"
+                >
+                  Gunakan Logo Resmi EVP (Hitam Putih)
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-950 p-2 text-white">
+                  {logoUrl && logoUrl !== '/icon.svg' ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+                  ) : (
+                    <AppLogo size="sm" iconOnly={true} />
+                  )}
+                </div>
+
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="Contoh: /icon.svg atau https://domain.com/logo.png"
+                    className="text-xs h-9"
+                  />
+                  <span className="text-[11px] text-neutral-400">
+                    Kosongkan atau gunakan <code>/icon.svg</code> untuk menggunakan logo tema hitam-putih EVP.
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-context';
 import { ShieldCheck, ArrowLeft, KeyRound, Mail, Sparkles } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { AppLogo } from '@/components/ui/app-logo';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -74,8 +75,8 @@ export default function AdminLoginPage() {
       <div className="mx-auto w-full max-w-md px-4 py-8">
         <div className="rounded-2xl border border-neutral-200/90 bg-white p-6 sm:p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
           <div className="mb-6 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-xs dark:bg-white dark:text-neutral-900 mb-3">
-              <ShieldCheck className="h-6 w-6" />
+            <div className="mx-auto mb-4 flex justify-center">
+              <AppLogo size="lg" subtitle="Management Portal" />
             </div>
             <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
               Masuk Portal Admin
