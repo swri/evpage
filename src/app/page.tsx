@@ -68,15 +68,15 @@ export default function HomePage() {
       {/* Main Content */}
       <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
         {/* Hero Section */}
-        <div className="mb-12 border-b border-neutral-200 pb-10 dark:border-neutral-800">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-600 shadow-2xs dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 mb-4">
+        <div className="mb-8 sm:mb-12 border-b border-neutral-200 pb-6 sm:pb-10 dark:border-neutral-800">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1 text-[11px] sm:text-xs font-medium text-neutral-600 shadow-2xs dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 mb-3 sm:mb-4">
             <Sparkles className="h-3.5 w-3.5 text-amber-500" />
             <span>Pendaftaran Event Resmi & Pembayaran Terverifikasi</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 sm:text-4xl">
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 sm:text-4xl">
             Event & Pendaftaran Terbuka
           </h1>
-          <p className="mt-2 text-base text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed">
+          <p className="mt-2 text-xs sm:text-base text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed">
             Pilih event di bawah untuk mengisi formulir pendaftaran, unggah bukti pembayaran, dan dapatkan konfirmasi instan melalui WhatsApp.
           </p>
         </div>
@@ -96,11 +96,11 @@ export default function HomePage() {
           </div>
 
           {loading ? (
-            <div className="grid gap-6 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-6">
               {[1, 2].map((i) => (
                 <div
                   key={i}
-                  className="h-72 rounded-xl border border-neutral-200 bg-white p-6 shadow-xs animate-pulse dark:border-neutral-800 dark:bg-neutral-900"
+                  className="h-64 sm:h-72 rounded-xl border border-neutral-200 bg-white p-4 sm:p-6 shadow-xs animate-pulse dark:border-neutral-800 dark:bg-neutral-900"
                 />
               ))}
             </div>
@@ -115,7 +115,7 @@ export default function HomePage() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-6">
               {openEvents.map((event) => {
                 const isFree = event.price_type === 'free' || event.price_amount === 0;
                 const remainingQuota = Math.max(0, event.quota - (event.total_registrations || 0));
@@ -128,42 +128,42 @@ export default function HomePage() {
                     <div>
                       {/* Event Cover Image */}
                       {event.cover_url && (
-                        <div className="relative h-44 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800">
+                        <div className="relative h-28 sm:h-44 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={event.cover_url}
                             alt={event.title}
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-102"
                           />
-                          <div className="absolute top-3 right-3">
-                            <Badge variant="success">Buka</Badge>
+                          <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
+                            <Badge variant="success" className="text-[10px] px-1.5 py-0.5 sm:text-xs sm:px-2.5 sm:py-0.5">Buka</Badge>
                           </div>
                         </div>
                       )}
 
-                      <div className="p-5 sm:p-6">
-                        <h3 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200">
+                      <div className="p-3 sm:p-6">
+                        <h3 className="text-sm sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 line-clamp-2">
                           {event.title}
                         </h3>
 
                         {/* Location & Date */}
-                        <div className="mt-3.5 space-y-2 text-xs text-neutral-500 dark:text-neutral-400">
+                        <div className="mt-2 sm:mt-3.5 space-y-1 sm:space-y-2 text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400">
                           {event.starts_at && (
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-3.5 w-3.5 shrink-0" />
-                              <span>{formatIndoDate(event.starts_at, true)}</span>
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                              <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                              <span className="line-clamp-1">{formatIndoDate(event.starts_at, true)}</span>
                             </div>
                           )}
                           {event.location && (
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 shrink-0" />
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                               <span className="line-clamp-1">{event.location}</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
-                            <Users className="h-3.5 w-3.5 shrink-0" />
-                            <span>
-                              Sisa Kuota: <strong className="text-neutral-800 dark:text-neutral-200">{remainingQuota} slot</strong> dari total {event.quota}
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                            <span className="line-clamp-1">
+                              Sisa: <strong className="text-neutral-800 dark:text-neutral-200">{remainingQuota} slot</strong>
                             </span>
                           </div>
                         </div>
@@ -171,25 +171,26 @@ export default function HomePage() {
                     </div>
 
                     {/* Card Footer with Price & Button */}
-                    <div className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50/50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 border-t border-neutral-100 bg-neutral-50/50 p-3 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
                       <div>
-                        <div className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
-                          Biaya Registrasi
+                        <div className="text-[10px] sm:text-[11px] font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+                          Biaya
                         </div>
-                        <div className="text-base font-bold text-neutral-900 dark:text-neutral-100">
+                        <div className="text-xs sm:text-base font-bold text-neutral-900 dark:text-neutral-100">
                           {isFree ? 'Gratis' : formatRupiah(event.price_amount)}
                           {event.price_type === 'per_participant' && (
-                            <span className="text-xs font-normal text-neutral-500"> /peserta</span>
+                            <span className="text-[10px] sm:text-xs font-normal text-neutral-500"> /peserta</span>
                           )}
                         </div>
                       </div>
 
                       <Link
                         href={`/e/${event.slug}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg bg-neutral-900 px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors"
                       >
-                        <span>Daftar Sekarang</span>
-                        <ArrowRight className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Daftar Sekarang</span>
+                        <span className="sm:hidden">Daftar</span>
+                        <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </Link>
                     </div>
                   </div>
