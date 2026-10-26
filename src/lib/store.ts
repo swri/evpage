@@ -433,7 +433,7 @@ export async function getRegistrationsByEvent(eventId: string): Promise<Registra
  */
 export function calculateRegistrationAmount(
   event: Pick<EventItem, 'price_type' | 'price_amount' | 'form_schema'>,
-  answers: Record<string, any>
+  answers: Record<string, unknown>
 ): number {
   if (event.price_type === 'free') return 0;
   const price = Math.max(0, Number(event.price_amount) || 0);
