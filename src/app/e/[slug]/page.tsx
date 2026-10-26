@@ -36,6 +36,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { PROOF_ACCEPT, storePaymentProof, validateProofFile } from '@/lib/payment-proof';
 
 function EventRegistrationContent({
   params,
@@ -54,6 +55,7 @@ function EventRegistrationContent({
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [paymentProofName, setPaymentProofName] = useState<string>('');
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -152,16 +154,14 @@ function EventRegistrationContent({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        type: 'error',
-        title: 'Ukuran Terlalu Besar',
-        message: 'Ukuran bukti pembayaran maksimal 5 MB.',
-      });
+    const problem = validateProofFile(file);
+    if (problem) {
+      toast({ type: 'error', title: 'Berkas Tidak Valid', message: problem });
       return;
     }
 
     setPaymentProofName(file.name);
+    setPaymentProofFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
       setPaymentProof(reader.result as string);
@@ -280,7 +280,11 @@ function EventRegistrationContent({
         contact_name: detectedName,
         contact_phone: detectedPhone,
         contact_email: detectedEmail,
-        payment_proof_path: paymentProof || undefined,
+        // Uploaded to private storage in Supabase mode, inline data URL in demo mode
+        payment_proof_path:
+          paymentProof && paymentProofFile
+            ? await storePaymentProof(event.id, paymentProofFile, paymentProof)
+            : undefined,
       });
 
       setCreatedRegistration(newRegistration);
@@ -744,7 +748,7 @@ function EventRegistrationContent({
                           <span>{paymentProof ? 'Ganti Bukti' : 'Pilih Berkas Bukti'}</span>
                           <input
                             type="file"
-                            accept="image/jpeg,image/png,image/webp,application/pdf"
+                            accept={PROOF_ACCEPT}
                             onChange={handleProofUpload}
                             className="sr-only"
                           />

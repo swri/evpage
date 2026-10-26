@@ -38,6 +38,7 @@ import {
 import * as XLSX from 'xlsx';
 import { sanitizeCsvRow } from '@/lib/export';
 import { useOrg } from '@/components/admin/org-context';
+import { PaymentProofPreview, PaymentProofThumb } from '@/components/admin/payment-proof-preview';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 function EventRegistrationsContent({
@@ -723,12 +724,7 @@ function EventRegistrationsContent({
                             onClick={() => openDetail(reg)}
                             className="group relative h-10 w-10 overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700 cursor-pointer"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={reg.payment_proof_path}
-                              alt="Bukti"
-                              className="h-full w-full object-cover group-hover:opacity-80 transition-opacity"
-                            />
+                            <PaymentProofThumb path={reg.payment_proof_path} />
                           </button>
                         ) : (
                           <span className="text-neutral-400 text-[11px]">-</span>
@@ -917,25 +913,7 @@ function EventRegistrationsContent({
                 Bukti Pembayaran (Total: {formatRupiah(activeDetailReg.total_amount)})
               </h3>
               {activeDetailReg.payment_proof_path ? (
-                <div className="space-y-2">
-                  <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={activeDetailReg.payment_proof_path}
-                      alt="Bukti Transfer"
-                      className="w-full max-h-72 object-contain"
-                    />
-                  </div>
-                  <a
-                    href={activeDetailReg.payment_proof_path}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    <span>Buka Bukti Gambar Ukuran Penuh</span>
-                  </a>
-                </div>
+                <PaymentProofPreview path={activeDetailReg.payment_proof_path} />
               ) : (
                 <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-center text-xs text-neutral-400">
                   Tidak ada bukti pembayaran yang diunggah (Event Gratis / Belum diupload)
