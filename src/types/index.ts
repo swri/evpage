@@ -93,6 +93,8 @@ export interface EventItem {
   description: string;
   cover_url?: string;
   location?: string;
+  /** Map link (e.g. Google Maps share URL) opened from the location */
+  location_url?: string | null;
   starts_at?: string;
   registration_deadline?: string;
   quota: number;

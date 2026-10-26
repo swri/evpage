@@ -13,6 +13,7 @@ import {
 import { BUILT_IN_TEMPLATES } from '@/lib/data-service';
 import { listEventTypes, resolveEventType } from '@/lib/event-types';
 import { refreshPublicPages } from '@/lib/public-refresh';
+import { isHttpUrl } from '@/lib/links';
 import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib/notifications';
 import { saveEvent, formatRupiah } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
@@ -114,6 +115,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
     'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&auto=format&fit=crop&q=80'
   );
   const [location, setLocation] = useState(initialEvent?.location || '');
+  const [locationUrl, setLocationUrl] = useState(initialEvent?.location_url || '');
   const [startsAt, setStartsAt] = useState(
     initialEvent?.starts_at ? initialEvent.starts_at.slice(0, 16) : ''
   );
@@ -346,6 +348,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         description: description.trim(),
         cover_url: coverUrl.trim(),
         location: location.trim(),
+        location_url: locationUrl.trim() || null,
         starts_at: startsAt ? new Date(startsAt).toISOString() : undefined,
         registration_deadline: deadline ? new Date(deadline).toISOString() : undefined,
         quota,
@@ -1178,6 +1181,24 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
                 placeholder="Contoh: Grand Futsal Arena, Jakarta Selatan"
                 className="text-xs h-9"
               />
+              <label htmlFor="location-url" className="mt-2 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block mb-1">
+                Link Lokasi (Google Maps), opsional
+              </label>
+              <Input
+                id="location-url"
+                type="url"
+                inputMode="url"
+                value={locationUrl}
+                onChange={(e) => setLocationUrl(e.target.value)}
+                placeholder="https://maps.app.goo.gl/..."
+                aria-invalid={!!locationUrl.trim() && !isHttpUrl(locationUrl)}
+                className="text-xs h-9"
+              />
+              <p className="text-[11px] text-neutral-400 mt-1">
+                {locationUrl.trim() && !isHttpUrl(locationUrl)
+                  ? 'Harus URL lengkap, diawali https://'
+                  : 'Kosongkan untuk membuka pencarian Google Maps dari alamat di atas.'}
+              </p>
             </div>
 
             {/* Quota */}

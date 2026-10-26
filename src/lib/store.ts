@@ -4,6 +4,7 @@ import { createClient as getSupabaseClient, isSupabaseConfigured } from './supab
 import { dbError, getStorage, isBrowser, setStorage } from './local-db.ts';
 import { getOrganization } from './orgs.ts';
 import { renderTemplate, whatsAppLink } from './notifications.ts';
+import { isHttpUrl } from './links.ts';
 import { DEMO_ORG_ID } from './data-service.ts';
 
 export { formatRupiah, formatIndoDate, isSupabaseConfigured };
@@ -161,6 +162,7 @@ function toEventRow(evt: EventItem) {
     description: evt.description,
     cover_url: evt.cover_url,
     location: evt.location,
+    location_url: evt.location_url || null,
     starts_at: evt.starts_at,
     registration_deadline: evt.registration_deadline,
     quota: evt.quota,
@@ -196,6 +198,9 @@ export function validateEventInput(data: Partial<EventItem>): string | null {
   }
   if (data.price_amount !== undefined && (!Number.isFinite(data.price_amount) || data.price_amount < 0)) {
     return 'Harga tidak boleh negatif';
+  }
+  if (data.location_url && !isHttpUrl(data.location_url)) {
+    return 'Link lokasi harus berupa URL lengkap yang diawali https://';
   }
   if (data.starts_at && Number.isNaN(Date.parse(data.starts_at))) return 'Tanggal mulai tidak valid';
   if (data.registration_deadline && Number.isNaN(Date.parse(data.registration_deadline))) {
@@ -270,6 +275,7 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       description: eventData.description || '',
       cover_url: eventData.cover_url || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=80',
       location: eventData.location || '',
+      location_url: eventData.location_url || null,
       starts_at: eventData.starts_at || new Date(Date.now() + 86400000 * 14).toISOString(),
       registration_deadline: eventData.registration_deadline || new Date(Date.now() + 86400000 * 10).toISOString(),
       quota: eventData.quota ?? 50,

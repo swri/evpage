@@ -22,6 +22,13 @@ test('validateEventInput rejects negative or malformed numbers and dates', () =>
   );
 });
 
+test('validateEventInput accepts only http(s) location links', () => {
+  assert.equal(validateEventInput({ location_url: 'https://maps.app.goo.gl/x' }), null);
+  assert.equal(validateEventInput({ location_url: null }), null);
+  assert.match(validateEventInput({ location_url: 'javascript:alert(1)' }) || '', /https:\/\//);
+  assert.match(validateEventInput({ location_url: 'maps.app.goo.gl/x' }) || '', /https:\/\//);
+});
+
 test('saveEvent normalises slugs on update and blocks collisions', async () => {
   const a = await saveEvent({ title: 'Slug A ' + Date.now(), form_schema: [] });
   const b = await saveEvent({ title: 'Slug B ' + Date.now(), form_schema: [] });

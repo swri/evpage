@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PROOF_ACCEPT, storePaymentProof, validateProofFile } from '@/lib/payment-proof';
+import { linkifyText, locationHref } from '@/lib/links';
 
 /** Empty answers matching the form schema (repeaters start with their minimum rows). */
 function initialAnswersFor(evt: EventItem | null): Record<string, unknown> {
@@ -577,9 +578,18 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                   </div>
                 )}
                 {event.location && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-neutral-500 shrink-0" />
-                    <span className="line-clamp-1">{event.location}</span>
+                  // Full width and wrapping: long addresses must stay readable
+                  <div className="flex items-start gap-2 sm:col-span-2 sm:order-first">
+                    <MapPin className="h-4 w-4 text-neutral-500 shrink-0 mt-px" />
+                    <a
+                      href={locationHref(event.location, event.location_url) ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="break-words underline decoration-neutral-300 underline-offset-2 hover:text-neutral-900 hover:decoration-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-100"
+                    >
+                      {event.location}
+                      <span className="ml-1 whitespace-nowrap text-neutral-500 no-underline">· Buka di Maps</span>
+                    </a>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
@@ -605,8 +615,23 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
 
               {/* Description (Markdown-like formatting) */}
               {event.description && (
-                <div className="mt-6 prose prose-neutral dark:prose-invert max-w-none text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-line leading-relaxed bg-neutral-50/60 dark:bg-neutral-900/60 p-4 rounded-xl border border-neutral-200/60 dark:border-neutral-800">
-                  {event.description}
+                <div className="mt-6 prose prose-neutral dark:prose-invert max-w-none text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-line break-words leading-relaxed bg-neutral-50/60 dark:bg-neutral-900/60 p-4 rounded-xl border border-neutral-200/60 dark:border-neutral-800">
+                  {/* http(s) URLs written by the organizer become clickable links */}
+                  {linkifyText(event.description).map((seg, i) =>
+                    seg.type === 'link' ? (
+                      <a
+                        key={i}
+                        href={seg.href}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        {seg.value}
+                      </a>
+                    ) : (
+                      <React.Fragment key={i}>{seg.value}</React.Fragment>
+                    )
+                  )}
                 </div>
               )}
             </div>
