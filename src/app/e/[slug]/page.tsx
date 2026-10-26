@@ -218,7 +218,7 @@ function EventRegistrationContent({
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
   // Submit Handler
@@ -231,14 +231,15 @@ function EventRegistrationContent({
       return;
     }
 
-    if (!validateForm()) {
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
       toast({
         type: 'error',
         title: 'Formulir Belum Lengkap',
         message: 'Mohon periksa kembali isian formulir yang ditandai merah.',
       });
-      // Scroll to first error
-      const firstErrorKey = Object.keys(errors)[0];
+      // Scroll to first error (state from setErrors is not visible until the next render)
+      const firstErrorKey = Object.keys(formErrors)[0];
       const errorElement = document.getElementById(firstErrorKey);
       if (errorElement) {
         errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
