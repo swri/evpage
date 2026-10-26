@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getAllEvents, getAllRegistrations, formatRupiah, formatIndoDate } from '@/lib/store';
-import { getCurrentAdminSession } from '@/lib/auth';
+import { getCurrentAdminSession, isSuperAdmin as checkSuperAdmin } from '@/lib/auth';
 import { EventItem, Registration } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ import {
 export default function AdminDashboardPage() {
   const session = getCurrentAdminSession();
   const currentUserId = session?.user?.id;
-  const isSuperAdmin = session?.user?.email === 'admin@evpage.com';
+  const isSuperAdmin = checkSuperAdmin(session);
 
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<Registration[]>([]);

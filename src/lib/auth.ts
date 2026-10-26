@@ -268,6 +268,24 @@ export async function loginAdmin(
   return { success: true, session };
 }
 
+// Platform-wide admin that may see and manage every organizer's events.
+// Kept in one place so a real role column can replace it later.
+export const SUPER_ADMIN_EMAIL = 'admin@evpage.com';
+
+export function isSuperAdmin(session: AdminSession | null): boolean {
+  return session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL;
+}
+
+/**
+ * Organizer access check used by the admin pages. It is a UI guard only;
+ * real enforcement must live in the database (RLS) in Supabase mode.
+ */
+export function canManageEvent(event: { created_by?: string }, session: AdminSession | null): boolean {
+  if (!session) return false;
+  if (isSuperAdmin(session)) return true;
+  return !!event.created_by && event.created_by === session.user.id;
+}
+
 export function getCurrentAdminSession(): AdminSession | null {
   if (typeof window === 'undefined') return null;
   try {

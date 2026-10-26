@@ -332,7 +332,7 @@ export async function deleteEvent(id: string): Promise<boolean> {
   return true;
 }
 
-export async function duplicateEvent(id: string): Promise<EventItem> {
+export async function duplicateEvent(id: string, createdBy?: string): Promise<EventItem> {
   const original = await getEventById(id);
   if (!original) throw new Error('Event yang akan diduplikasi tidak ditemukan');
 
@@ -342,7 +342,9 @@ export async function duplicateEvent(id: string): Promise<EventItem> {
     title: `${original.title} (Salinan)`,
     slug: `${original.slug}-copy`,
     status: 'draft',
-    prefix_code: original.prefix_code
+    prefix_code: original.prefix_code,
+    // The copy belongs to whoever duplicated it
+    created_by: createdBy ?? original.created_by,
   };
 
   return saveEvent(copy);

@@ -4,6 +4,7 @@ import React, { useEffect, useState, use } from 'react';
 import { EventBuilder } from '@/components/admin/event-builder';
 import { getEventById } from '@/lib/store';
 import { EventItem } from '@/types';
+import { canManageEvent, getCurrentAdminSession } from '@/lib/auth';
 
 function EditEventContent({
   params,
@@ -36,6 +37,14 @@ function EditEventContent({
     return (
       <div className="p-12 text-center text-neutral-500">
         Event yang dicari tidak ditemukan.
+      </div>
+    );
+  }
+
+  if (!canManageEvent(event, getCurrentAdminSession())) {
+    return (
+      <div className="p-12 text-center text-neutral-500">
+        Anda tidak memiliki akses untuk mengubah event ini.
       </div>
     );
   }

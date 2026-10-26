@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getAllEvents, duplicateEvent, deleteEvent, formatRupiah } from '@/lib/store';
-import { getCurrentAdminSession } from '@/lib/auth';
+import { getCurrentAdminSession, isSuperAdmin as checkSuperAdmin } from '@/lib/auth';
 import { EventItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ export default function AdminEventsPage() {
   const { toast } = useToast();
   const session = getCurrentAdminSession();
   const currentUserId = session?.user?.id;
-  const isSuperAdmin = session?.user?.email === 'admin@evpage.com';
+  const isSuperAdmin = checkSuperAdmin(session);
 
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ export default function AdminEventsPage() {
 
   const handleDuplicate = async (id: string, title: string) => {
     try {
-      await duplicateEvent(id);
+      await duplicateEvent(id, currentUserId);
       toast({
         type: 'success',
         title: 'Event Berhasil Diduplikasi',

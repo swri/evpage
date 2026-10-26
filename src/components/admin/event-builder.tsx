@@ -329,7 +329,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         prefix_code: prefixCode.trim().toUpperCase(),
         status,
         organizer_name: organizerName.trim() || 'Panitia Resmi',
-        created_by: currentSession?.user?.id,
+        // Editing must not transfer ownership to whoever saves (e.g. super admin)
+        created_by: initialEvent?.created_by ?? currentSession?.user?.id,
         form_schema: sanitizedFields,
         wa_template: waTemplate.trim(),
         success_message: successMessage.trim(),

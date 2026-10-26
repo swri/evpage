@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sanitizeCsvRow } from '@/lib/export';
+import { canManageEvent, getCurrentAdminSession } from '@/lib/auth';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 function EventRegistrationsContent({
@@ -51,6 +52,7 @@ function EventRegistrationsContent({
   const [event, setEvent] = useState<EventItem | null>(null);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,6 +87,13 @@ function EventRegistrationsContent({
         getEventById(eventId),
         getRegistrationsByEvent(eventId),
       ]);
+      // Participant data is personal; only the event owner (or super admin) may see it
+      if (evt && !canManageEvent(evt, getCurrentAdminSession())) {
+        setAccessDenied(true);
+        setEvent(null);
+        setRegistrations([]);
+        return;
+      }
       setEvent(evt);
       setRegistrations(regs);
     } catch (err) {
@@ -398,6 +407,14 @@ function EventRegistrationsContent({
     }*.\n\n${reg.admin_note ? `Catatan Panitia: "${reg.admin_note}"\n\n` : ''}Terima kasih,\nPanitia Penyelenggara.`;
     return `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`;
   };
+
+  if (accessDenied) {
+    return (
+      <div className="p-12 text-center text-neutral-500">
+        Anda tidak memiliki akses ke data pendaftar event ini.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
