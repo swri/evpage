@@ -320,7 +320,28 @@ export async function deleteEvent(id: string): Promise<boolean> {
   const filtered = currentEvents.filter(e => e.id !== id);
   memoryEvents = filtered;
   if (isBrowser) setStorage(STORAGE_KEYS.EVENTS, filtered);
+  // Same as ON DELETE CASCADE in Postgres: registrations go with the event
+  const remainingRegs = (await getAllRegistrations()).filter(r => r.event_id !== id);
+  memoryRegistrations = remainingRegs;
+  if (isBrowser) setStorage(STORAGE_KEYS.REGISTRATIONS, remainingRegs);
   return true;
+}
+
+/**
+ * Demo-mode counterpart of purge_event_payment_proofs: drops the inline
+ * proofs of one event. Returns how many registrations were cleared.
+ */
+export async function clearLocalPaymentProofs(eventId: string): Promise<number> {
+  const now = new Date().toISOString();
+  let cleared = 0;
+  const regs = (await getAllRegistrations()).map(r => {
+    if (r.event_id !== eventId || !r.payment_proof_path) return r;
+    cleared++;
+    return { ...r, payment_proof_path: '', payment_proof_purged_at: now };
+  });
+  memoryRegistrations = regs;
+  if (isBrowser) setStorage(STORAGE_KEYS.REGISTRATIONS, regs);
+  return cleared;
 }
 
 export async function duplicateEvent(id: string, createdBy?: string): Promise<EventItem> {

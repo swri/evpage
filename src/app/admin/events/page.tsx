@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getAllEvents, duplicateEvent, deleteEvent, formatRupiah } from '@/lib/store';
+import { getAllEvents, duplicateEvent, formatRupiah } from '@/lib/store';
+import { deleteEventWithFiles } from '@/lib/cleanup';
 import { useOrg } from '@/components/admin/org-context';
 import { EventItem } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -74,7 +75,8 @@ export default function AdminEventsPage() {
     }
 
     try {
-      await deleteEvent(id);
+      // Also removes the event's payment-proof files from Storage
+      await deleteEventWithFiles(id);
       toast({
         type: 'info',
         message: `Event "${title}" berhasil dihapus.`,

@@ -18,6 +18,7 @@ import {
   X,
   ChevronRight,
   Building2,
+  ShieldCheck,
 } from 'lucide-react';
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
@@ -66,7 +67,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, organizations, activeOrg, setActiveOrg, invitations } = useOrg();
+  const { session, organizations, activeOrg, setActiveOrg, invitations, isPlatformAdmin } = useOrg();
   const adminUser = session?.user ?? null;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -106,6 +107,10 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       icon: Settings,
       active: pathname === '/admin/settings',
     },
+    // App owner only: storage usage and deleting unused data
+    ...(isPlatformAdmin
+      ? [{ label: 'Pemeliharaan Platform', href: '/admin/platform', icon: ShieldCheck, active: pathname === '/admin/platform' }]
+      : []),
   ];
 
   return (

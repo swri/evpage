@@ -139,6 +139,8 @@ export interface Registration {
   total_amount: number;
   payment_proof_path?: string;
   payment_proof_url?: string;
+  /** Set when the organizer cleaned up proofs after the event */
+  payment_proof_purged_at?: string | null;
   status: RegistrationStatus;
   /** People in this registration (rows of the first repeater, min 1) */
   participant_count?: number;

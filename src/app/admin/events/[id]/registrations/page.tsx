@@ -39,6 +39,7 @@ import {
   Shuffle,
   ArrowUpCircle,
   UserCheck,
+  HardDrive,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sanitizeCsvRow } from '@/lib/export';
@@ -46,6 +47,7 @@ import { useOrg } from '@/components/admin/org-context';
 import { PaymentProofPreview, PaymentProofThumb } from '@/components/admin/payment-proof-preview';
 import { resolveEventType } from '@/lib/event-types';
 import { buildParticipantMessage } from '@/lib/notifications';
+import { StorageCleanupDialog } from '@/components/admin/storage-cleanup-dialog';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
@@ -75,6 +77,8 @@ function EventRegistrationsContent({
   const canCheckIn = can('registrations.checkin', event);
   const canEdit = can('registrations.edit', event);
   const canManageDraws = can('draws.manage', event);
+  const canManageEvents = can('events.manage', event);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
   const [promotedIds, setPromotedIds] = useState<string[]>([]);
 
   // Filters & Search
@@ -510,6 +514,20 @@ function EventRegistrationsContent({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Storage cleanup: event managers after the event, super admin any time */}
+          {canManageEvents && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCleanupOpen(true)}
+              className="h-8 text-xs gap-1.5"
+              title="Hapus bukti bayar setelah event selesai dan file yang tidak terpakai"
+            >
+              <HardDrive className="h-3.5 w-3.5" />
+              <span>Bersihkan Penyimpanan</span>
+            </Button>
+          )}
+
           {/* Grouping is an event-type module feature and can be switched off per event */}
           {eventTypeModule.grouping.enabled && canManageDraws && (
             <Button
@@ -1220,6 +1238,16 @@ function EventRegistrationsContent({
       </Dialog>
 
       {/* Random Team & Tournament Draw Modal */}
+      {event && (
+        <StorageCleanupDialog
+          open={cleanupOpen}
+          onOpenChange={setCleanupOpen}
+          event={event}
+          registrations={registrations}
+          onDone={loadData}
+        />
+      )}
+
       {/* Mounted once the event is known so its event-type defaults apply */}
       {event && (
       <RandomTeamModal

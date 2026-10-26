@@ -452,6 +452,44 @@ export async function acceptInvitation(invitationId: string, session: AdminSessi
   invitationTable.save(invitations);
 }
 
+/**
+ * Deletes the organization row (members, invitations and events cascade).
+ * Owner or platform admin. Storage files are removed first by lib/cleanup.
+ */
+export async function deleteOrganizationRecord(orgId: string, session: AdminSession | null): Promise<void> {
+  const s = requireSession(session);
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { data, error } = await supabase.from('organizations').delete().eq('id', orgId).select('id');
+    if (error) throw dbError('menghapus organisasi', error);
+    if (!data || data.length === 0) throw new Error('Anda tidak memiliki izin menghapus organisasi ini');
+    return;
+  }
+  const role = memberTable.all().find((m) => m.organization_id === orgId && m.user_id === s.user.id)?.role;
+  if (role !== 'owner' && !s.user.is_platform_admin) {
+    throw new Error('Anda tidak memiliki izin menghapus organisasi ini');
+  }
+  orgTable.save(orgTable.all().filter((o) => o.id !== orgId));
+  memberTable.save(memberTable.all().filter((m) => m.organization_id !== orgId));
+  invitationTable.save(invitationTable.all().filter((i) => i.organization_id !== orgId));
+}
+
+/** Demo-mode data for the platform overview (Supabase uses platform_overview()). */
+export function localOrganizationsSnapshot() {
+  return {
+    organizations: orgTable.all(),
+    members: memberTable.all(),
+    invitations: invitationTable.all(),
+  };
+}
+
+export function purgeLocalExpiredInvitations(): number {
+  const all = invitationTable.all();
+  const keep = all.filter((i) => i.accepted_at || Date.parse(i.expires_at) >= Date.now());
+  invitationTable.save(keep);
+  return all.length - keep.length;
+}
+
 export async function revokeInvitation(invitationId: string, session: AdminSession | null): Promise<void> {
   const s = requireSession(session);
   const supabase = getSupabaseClient();
