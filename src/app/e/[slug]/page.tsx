@@ -140,7 +140,8 @@ function EventRegistrationContent({
   const isClosed = event.status !== 'open';
   const isDeadlinePassed =
     event.registration_deadline && new Date(event.registration_deadline) < new Date();
-  const currentCount = event.total_registrations || 0;
+  // Same rule as createRegistration / create_registration_atomic: rejected ones free their slot
+  const currentCount = (event.verified_registrations || 0) + (event.pending_registrations || 0);
   const isQuotaFull = event.quota > 0 && currentCount >= event.quota;
   const remainingQuota = Math.max(0, event.quota - currentCount);
 
