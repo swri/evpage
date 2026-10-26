@@ -38,12 +38,16 @@ function getStorage<T>(key: string, defaultValue: T): T {
   }
 }
 
-function setStorage<T>(key: string, value: T): void {
-  if (!isBrowser) return;
+// Returns false when the browser refuses the write (usually the ~5 MB quota,
+// e.g. a large base64 payment proof), so callers can report it.
+function setStorage<T>(key: string, value: T): boolean {
+  if (!isBrowser) return true;
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch (err) {
     console.warn('Storage set error:', err);
+    return false;
   }
 }
 
@@ -482,8 +486,12 @@ export async function createRegistration(params: {
   };
 
   allRegs.unshift(newReg);
+  if (!setStorage(STORAGE_KEYS.REGISTRATIONS, allRegs)) {
+    throw new Error(
+      'Pendaftaran gagal disimpan: penyimpanan browser penuh. Coba unggah bukti pembayaran dengan ukuran lebih kecil.'
+    );
+  }
   memoryRegistrations = allRegs;
-  if (isBrowser) setStorage(STORAGE_KEYS.REGISTRATIONS, allRegs);
 
   return newReg;
 }
