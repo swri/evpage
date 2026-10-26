@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "test": "node --experimental-strip-types --experimental-test-module-mocks --test test/*.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
