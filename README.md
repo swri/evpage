@@ -1,179 +1,136 @@
-# EvPage — Form Pendaftaran Event yang Dapat Dikustomisasi (Multi-Event, White-Label)
+# EvPage — Platform Pendaftaran & Manajemen Event
 
-Aplikasi web modern untuk manajemen dan formulir pendaftaran event dengan form builder dinamis (JSON schema), kalkulasi biaya otomatis, integrasi pembayaran transfer manual & QRIS, konfirmasi WhatsApp otomatis, serta portal admin lengkap dengan TanStack Table dan export XLSX/CSV.
-
----
-
-## 🚀 Fitur Utama
-
-### 1. Area Publik / Pendaftar (Tanpa Login)
-- **URL Khusus per Event:** `/e/[slug]` (bisa langsung dibagikan ke media sosial / WhatsApp).
-- **Desain Estetik Notion-like:** Tipografi bersih (Geist / Inter), border halus, kartu dengan bayangan lembut, dan dukungan dark mode.
-- **Formulir Dinamis:** Dirender otomatis dari JSON Schema database:
-  - Teks pendek, teks panjang, angka, email, nomor HP, tanggal, select dropdown, radio, checkbox, upload berkas, dan **repeater (grup pemain tim berulang: nama, no punggung, posisi)**.
-- **Kalkulasi Biaya & Pembayaran:**
-  - Tipe harga: Gratis, Tetap (Fixed), atau Per-Peserta (berdasarkan jumlah baris repeater).
-  - Tampilan rekening bank transfer manual dan scan QRIS instan.
-  - Upload bukti pembayaran (JPG/PNG/PDF, maks 5 MB) dengan pratinjau langsung.
-- **Halaman Sukses & Konfirmasi WhatsApp:**
-  - Kode pendaftaran unik yang digenerate aman dari race condition (contoh: `MSC-2026-0001`).
-  - Efek selebrasi confetti animasi.
-  - Tombol **"Konfirmasi via WhatsApp Panitia"** yang membuka `wa.me/<nomor_admin>?text=<pesan>` dengan format variabel otomatis `{nama}`, `{kode}`, `{event}`, `{total}`, `{bukti}`.
-- **Halaman Cek Status Mandiri (`/status`):**
-  - Pendaftar dapat memeriksa status tiket (Menunggu Verifikasi, Terverifikasi, Ditolak) menggunakan kombinasi Kode Pendaftaran + Nomor WhatsApp tanpa mengekspos data orang lain.
-
-### 2. Area Admin (`/admin` — Wajib Login)
-- **Otentikasi Aman:** Integrasi Supabase Auth dengan pengecekan whitelist tabel `admins`, serta tombol kredensial demo instan (`admin@evpage.com` / `admin123`) untuk pengujian lokal tanpa hambatan.
-- **Dashboard Ringkasan KPI:**
-  - Total Pendaftar, Jumlah Terverifikasi, Menunggu, Ditolak, dan Total Pemasukan Bersih Terverifikasi.
-  - Progress bar keterisian kuota per event.
-- **Event Builder Interaktif (`/admin/events/new` & `/admin/events/[id]/edit`):**
-  - Tambah, hapus, dan urutkan susunan field formulir (drag & drop / tombol urut).
-  - Konfigurasi repeater (min/maks baris, kolom sub-fields).
-  - Preset template bawaan 1-klik:
-    1. *Turnamen Mini Soccer (Tim + Pemain)*
-    2. *Seminar / Workshop / Webinar*
-    3. *Lomba Individu / Kompetisi Kreatif*
-  - **Tab Pratinjau Live Form:** Coba isi formulir secara langsung sebelum disimpan.
-  - Duplikasi event dengan 1 klik.
-- **Tabel Pendaftar Lengkap (`/admin/events/[id]/registrations`):**
-  - Pencarian instan (kode, nama, nomor WA, email, nama tim, dll.).
-  - Filter status (Semua / Menunggu / Terverifikasi / Ditolak).
-  - Aksi massal (Bulk Verify & Bulk Reject).
-  - Side Drawer / Sheet untuk inspeksi detail pendaftar, pratinjau bukti bayar ukuran penuh, edit kontak, dan tombol hubungi WhatsApp langsung ke pendaftar.
-  - **Export Data:** Unduh laporan pendaftar ke **XLSX (Excel)** dan **CSV**.
-- **Pengaturan Organisasi (`/admin/settings`):**
-  - White-label: nama organisasi, logo, warna aksen, nomor WA admin, info rekening bank & URL QRIS.
+Platform event untuk dua jenis pengguna: **penyelenggara** (membuat event, memverifikasi pendaftar, membagi tim) dan **peserta** (mendaftar, membayar, cek status). Fokus awal: event olahraga seperti mini soccer. Arah ke depan: platform event umum.
 
 ---
 
-## 🛠️ Tech Stack
+## Fitur
 
-- **Framework:** Next.js 16 (App Router) + TypeScript + React 19
-- **Styling:** Tailwind CSS v4, desain terinspirasi Notion
-- **Komponen & Ikon:** shadcn/ui style components, Lucide React
-- **Tabel Data:** TanStack Table
-- **Spreadsheet Export:** `xlsx`
-- **Database & Storage:** Supabase Postgres, RLS, Storage Bucket `payment-proofs`
-- **Validasi:** Zod & React Hook Form
-- **Package Manager:** `pnpm`
+### Peserta (tanpa login)
+- Halaman pendaftaran per event: `/e/[slug]`.
+- Formulir dinamis dari JSON schema: teks, angka, email, HP, tanggal, select, radio, checkbox, file, dan **repeater** (mis. daftar pemain).
+- Tipe harga: gratis, tetap, atau per peserta (dihitung dari jumlah baris repeater pertama). Total selalu dihitung di sisi aplikasi/DB, bukan dari input browser.
+- Instruksi transfer bank/QRIS dan unggah bukti bayar (maks. 5 MB).
+- Kode pendaftaran `PREFIX-TAHUN-0001` dan tombol konfirmasi ke WhatsApp panitia (template `{nama}`, `{kode}`, `{event}`, `{total}`, `{bukti}`).
+- Cek status di `/status`: **kode + nomor WhatsApp wajib cocok**.
+
+### Penyelenggara (`/admin`)
+- Dashboard KPI per penyelenggara; super admin (`admin@evpage.com`) dapat melihat semua event.
+- Event builder: urutkan field, repeater, template bawaan (Mini Soccer, Seminar, Lomba Individu), pratinjau live, duplikasi event.
+- Tabel pendaftar: cari, filter status, verifikasi/tolak massal, edit data, ekspor XLSX/CSV (CSV dinetralkan dari formula injection).
+- **Tool acak tim** dan undian bagan turnamen:
+  - Ukuran tim selisih maksimal 1; peserta "prioritas" (default: kiper) disebar lebih dulu.
+  - Tanpa bias urutan tim; **seed** ditampilkan dan dicantumkan di pengumuman WA, sehingga hasil bisa diulang dan diaudit.
+  - Pindah pemain manual (seed lalu ditandai "diubah manual").
+- Pengaturan organisasi: nama, logo, warna, nomor WA, rekening, QRIS.
 
 ---
 
-## 📦 Panduan Instalasi Lokal
+## Stack
 
-### 1. Clone Repository & Install Dependensi
+| Bagian | Teknologi |
+| --- | --- |
+| Framework | Next.js 16 (App Router, Cache Components), React 19, TypeScript |
+| Styling | Tailwind CSS v4, komponen gaya shadcn, Lucide |
+| Data | Supabase Postgres + RLS + RPC (opsional); mode demo di `localStorage` |
+| Ekspor | `xlsx` (SheetJS) |
+| Test | `node:test` bawaan Node (tanpa framework tambahan) |
+| Package manager | `pnpm` |
+
+> `@dnd-kit/*`, `@tanstack/react-table`, `react-hook-form`, `@hookform/resolvers`, dan `zod` terpasang tetapi **belum dipakai** oleh kode.
+
+### Dua mode data
+
+| | Mode demo | Mode Supabase |
+| --- | --- | --- |
+| Aktif bila | `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` kosong atau placeholder | keduanya diisi |
+| Penyimpanan | `localStorage` per browser (data tidak dibagi antar perangkat) | Postgres |
+| Login admin | akun lokal + demo `admin@evpage.com` / `admin123` | Supabase Auth + tabel `admins` saja |
+| Pendaftaran | di browser peserta | RPC `create_registration_atomic` (kuota atomik) |
+| Cek status | di browser | RPC `check_registration_status` |
+
+Di mode Supabase, semua error DB diteruskan ke UI. Tidak ada lagi fallback diam-diam ke data demo.
+
+---
+
+## Setup lokal
+
+Butuh Node 22+ (dikembangkan di Node 24) dan pnpm.
+
 ```bash
-git clone <repo-url>
-cd evpage
 pnpm install
+cp .env.example .env.local   # biarkan placeholder untuk mode demo
+pnpm dev                      # http://localhost:3000
 ```
 
-### 2. Setup Environment Variables
-Salin file konfigurasi contoh:
-```bash
-cp .env.example .env.local
-```
+Mode Supabase (opsional): jalankan `supabase/schema.sql` di SQL Editor project **development**, lalu isi URL dan anon key di `.env.local`.
 
-Isi variabel environment di `.env.local`:
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_ENABLE_DEMO_MODE=true
-```
-> *Catatan:* Jika kredensial Supabase dikosongkan, aplikasi otomatis beralih ke **Demo Store & In-Memory Mode** dengan data bawaan siap pakai (Turnamen Mini Soccer, Seminar AI, dll.), sehingga Anda bisa langsung menguji seluruh fitur tanpa setup database eksternal terlebih dahulu!
+## Perintah
 
-### 3. Setup Database Supabase (Opsional jika menggunakan Supabase langsung)
-Buka menu **SQL Editor** pada dashboard proyek Supabase Anda, lalu jalankan seluruh isi file:
-```
-supabase/schema.sql
-```
-atau via Supabase CLI:
-```bash
-supabase db push
-```
-
-File migrasi ini mencakup:
-- Tabel `admins`, `organizations`, `events`, `registrations`.
-- Fungsi atomik PostgreSQL `create_registration_atomic(...)` untuk mencegah *race condition / overselling* kuota dan membuat nomor tiket urut otomatis.
-- Policy Row Level Security (RLS) lengkap.
-- Konfigurasi bucket privat `payment-proofs`.
-
-### 4. Jalankan Server Development
-```bash
-pnpm dev
-```
-Buka browser di [http://localhost:3000](http://localhost:3000).
+| Perintah | Fungsi |
+| --- | --- |
+| `pnpm dev` | server development |
+| `pnpm test` | semua test di `test/*.test.ts` (termasuk test cabang Supabase dengan klien tiruan) |
+| `pnpm lint` | ESLint |
+| `npx tsc --noEmit` | type check |
+| `pnpm build` | build produksi |
 
 ---
 
-## 🔐 Akun Login Admin Demo
-- **URL Login:** [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
-- **Email:** `admin@evpage.com`
-- **Password:** `admin123`
-- *(Tersedia tombol satu-klik "Isi Kredensial Demo Instan" di form login)*
-
----
-
-## 📂 Struktur Direktori Proyek
+## Struktur
 
 ```
-evpage/
-├── public/                     # Aset statis & favicon
-├── src/
-│   ├── app/
-│   │   ├── admin/              # Portal Manajemen Penyelenggara
-│   │   │   ├── events/         # Daftar Event & Builder
-│   │   │   │   ├── [id]/
-│   │   │   │   │   ├── edit/   # Edit Event & Form Schema
-│   │   │   │   │   └── registrations/ # Tabel Pendaftar & Export
-│   │   │   │   └── new/        # Buat Event Baru
-│   │   │   ├── login/          # Halaman Login Admin
-│   │   │   ├── settings/       # Pengaturan Organisasi & Rekening
-│   │   │   ├── layout.tsx      # Sidebar & Admin Auth Guard
-│   │   │   └── page.tsx        # Dashboard KPI & Ringkasan
-│   │   ├── e/
-│   │   │   └── [slug]/         # Halaman Publik Formulir Pendaftaran Event
-│   │   ├── status/             # Halaman Cek Status Tiket Publik
-│   │   ├── layout.tsx          # Root Layout & Toast Provider
-│   │   ├── page.tsx            # Landing Page Publik (Daftar Event Buka)
-│   │   └── globals.css         # Styling Notion & Desain Token
-│   ├── components/
-│   │   ├── admin/              # Komponen Builder & Event Editor
-│   │   ├── form/               # Dynamic Form Field Renderer
-│   │   └── ui/                 # Button, Input, Modal, Drawer, Badge, Toast, dll.
-│   ├── lib/
-│   │   ├── auth.ts             # Logika Otentikasi Admin
-│   │   ├── data-service.ts     # Template Bawaan & Sample Seed
-│   │   ├── store.ts            # State & Storage API Layer
-│   │   ├── supabase/           # Client, Server, & Admin Supabase
-│   │   └── utils.ts            # Helper Class Merge (cn)
-│   └── types/
-│       └── index.ts            # Definisi Tipe TypeScript Inti
-├── supabase/
-│   ├── migrations/             # SQL Migrations
-│   └── schema.sql              # Skema Lengkap Supabase
-├── .env.example                # Contoh Environment Variables
-├── package.json
-└── README.md
+src/
+  app/
+    e/[slug]/           halaman pendaftaran publik
+    status/             cek status tiket
+    admin/              dashboard, events, builder, pendaftar, settings, login/register
+  components/
+    admin/              event-builder, random-team-modal
+    form/               renderer field dinamis
+    ui/                 komponen dasar
+  lib/
+    store.ts            API data (demo/localStorage atau Supabase), harga, validasi event
+    auth.ts             login/registrasi admin, canManageEvent()
+    team-generator.ts   pembagian tim ber-seed, undian, format pengumuman
+    export.ts           sanitasi CSV
+    data-service.ts     template bawaan + data demo
+    supabase/           klien browser & server
+  types/index.ts        tipe inti (EventItem, FormField, Registration)
+supabase/schema.sql     skema, RLS, RPC, bucket (+ seed demo)
+supabase/migrations/    migrasi yang sama tanpa seed
+test/                   test node:test
 ```
 
 ---
 
-## 🚀 Panduan Deployment ke Vercel
+## Menambah jenis event baru
 
-1. Push repository Anda ke GitHub / GitLab.
-2. Buka [Vercel Dashboard](https://vercel.com) dan impor repository ini.
-3. Masukkan environment variable dari `.env.example` ke pengaturan Environment Variables di Vercel:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `NEXT_PUBLIC_APP_URL` (misal: `https://your-domain.vercel.app`)
-4. Klik **Deploy**. Vercel akan otomatis membangun dan merilis aplikasi Anda.
+Saat ini jenis event = **template form** + konfigurasi event. Tidak ada kolom `event_type`.
+
+1. **Template form.** Tambahkan entri ke `BUILT_IN_TEMPLATES` di `src/lib/data-service.ts` (`id`, `name`, `description`, `template` berisi `form_schema`, `price_type`, `quota`, `prefix_code`, dst.). Template langsung muncul di event builder.
+2. **Field peserta untuk pembagian kelompok.** `extractPlayersFromRegistrations` membaca baris repeater dengan key di `PLAYER_NAME_KEYS`, `PLAYER_ROLE_KEYS`, `PLAYER_NUMBER_KEYS`, dan `GROUP_ORIGIN_KEYS` (`src/lib/team-generator.ts`). Pakai salah satu key itu di sub-field repeater, atau tambahkan key baru ke daftar tersebut.
+3. **Aturan pembagian.** `generateBalancedTeams(players, n, names, { seed, spreadFirst })`:
+   - `spreadFirst` default `isSoccerGoalkeeper`; ganti dengan predikat lain (mis. `p => p.position === 'FASILITATOR'`) atau `() => false` untuk acak murni.
+4. **Label pengumuman.** `formatTeamsForWhatsApp(title, teams, { labels })`, ganti `SOCCER_ANNOUNCEMENT_LABELS` dengan label versi event Anda.
+
+Tahap 2 dan 3 belum bisa diatur per event dari UI (modal masih memakai default sepak bola). Lihat rekomendasi di laporan audit.
 
 ---
 
-## 📄 Lisensi
-Hak Cipta &copy; 2026 EvPage. Dikembangkan dengan standar modern full-stack web engineering.
+## Batasan yang diketahui
+
+- **Mode demo bukan untuk produksi:** data dan akun hanya ada di browser masing-masing.
+- Guard akses admin ada di UI. Di mode Supabase, RLS saat ini memberi **semua admin** akses ke semua event/pendaftar, dan tabel `events` belum punya kolom `created_by`.
+- Bukti bayar disimpan sebagai data URL base64 di kolom `payment_proof_path`, belum di bucket `payment-proofs`.
+- Kuota dihitung per pendaftaran, bukan per pemain.
+- Belum ada waitlist, check-in/daftar hadir, notifikasi otomatis, atau payment gateway.
+
+---
+
+## Deploy
+
+1. Siapkan project Supabase produksi; terapkan `supabase/migrations/` (bukan `schema.sql`, karena file itu berisi seed demo).
+2. Set env di hosting (mis. Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, dan `SUPABASE_SERVICE_ROLE_KEY` hanya bila nanti dipakai di server.
+3. `pnpm build` harus lolos; jalankan `pnpm test` di CI.
+4. Buat akun penyelenggara: daftar via `/admin/register`, lalu pastikan barisnya ada di tabel `admins` (lihat catatan RLS di laporan audit).
