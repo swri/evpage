@@ -37,16 +37,64 @@ export const DEFAULT_TEAM_CONFIGS = [
   { name: 'Tim Kuning (Yellow)', color: '#eab308', textColor: '#18181b', badgeBg: 'bg-amber-400 text-neutral-900' },
 ];
 
+// ==========================================
+// Randomness (seedable, so a draw can be replayed and audited)
+// ==========================================
+export type RandomFn = () => number;
+
+/** Short human-readable seed that organizers can announce with the result. */
+export function generateSeed(): string {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+/**
+ * Deterministic PRNG from a string seed (xmur3 hash + mulberry32).
+ * Same seed + same participant list => same teams.
+ */
+export function createSeededRandom(seed: string): RandomFn {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let state = h >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /**
  * Modern Fisher-Yates array shuffling
  */
-export function shuffleArray<T>(items: T[]): T[] {
+export function shuffleArray<T>(items: T[], random: RandomFn = Math.random): T[] {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+// ==========================================
+// Participant extraction
+// ==========================================
+// Answer keys recognised in repeater rows. Mini soccer templates use the
+// Indonesian names; generic events usually use name/role.
+export const PLAYER_NAME_KEYS = ['player_name', 'nama_pemain', 'name', 'nama'];
+export const PLAYER_ROLE_KEYS = ['position', 'posisi', 'role'];
+export const PLAYER_NUMBER_KEYS = ['back_number', 'no_punggung'];
+export const GROUP_ORIGIN_KEYS = ['team_name', 'nama_tim'];
+
+function firstPresent(source: Record<string, unknown>, keys: string[]): unknown {
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+  return undefined;
 }
 
 /**
@@ -57,56 +105,46 @@ export function extractPlayersFromRegistrations(registrations: Registration[]): 
   const result: PlayerParticipant[] = [];
 
   registrations.forEach((reg) => {
-    // Check if there is repeater data with players
     const answers = reg.answers || {};
+    const origin = firstPresent(answers, GROUP_ORIGIN_KEYS) as string | undefined;
     let foundRepeaterPlayers = false;
 
     for (const key of Object.keys(answers)) {
       const val = answers[key];
       if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0] !== null) {
-        // Look for player properties
         val.forEach((item: Record<string, unknown>, idx: number) => {
-          const playerName =
-            (item.player_name as string) ||
-            (item.nama_pemain as string) ||
-            (item.name as string) ||
-            (item.nama as string);
+          const playerName = firstPresent(item, PLAYER_NAME_KEYS);
+          if (playerName === undefined) return;
 
-          if (playerName && String(playerName).trim()) {
-            foundRepeaterPlayers = true;
-            const position =
-              (item.position as string) ||
-              (item.posisi as string) ||
-              (item.role as string) ||
-              undefined;
-            const backNumber =
-              (item.back_number as number | string) ||
-              (item.no_punggung as number | string) ||
-              undefined;
+          foundRepeaterPlayers = true;
+          const position = firstPresent(item, PLAYER_ROLE_KEYS);
+          const backNumber = firstPresent(item, PLAYER_NUMBER_KEYS) as number | string | undefined;
 
-            result.push({
-              id: `${reg.id}-player-${idx}`,
-              name: String(playerName).trim(),
-              registrationCode: reg.code,
-              contactPhone: reg.contact_phone,
-              teamOrigin: (answers.team_name as string) || (answers.nama_tim as string) || reg.contact_name,
-              position: position ? String(position).toUpperCase() : undefined,
-              backNumber,
-            });
-          }
+          result.push({
+            // Field key is part of the id: two repeaters in one registration
+            // would otherwise produce colliding ids.
+            id: `${reg.id}-${key}-${idx}`,
+            name: String(playerName).trim(),
+            registrationCode: reg.code,
+            contactPhone: reg.contact_phone,
+            teamOrigin: origin || reg.contact_name,
+            position: position !== undefined ? String(position).toUpperCase() : undefined,
+            backNumber,
+          });
         });
       }
     }
 
     // Fallback: If no repeater was found, treat contact_name as individual player
     if (!foundRepeaterPlayers && reg.contact_name) {
+      const position = firstPresent(answers, PLAYER_ROLE_KEYS);
       result.push({
         id: `${reg.id}-individual`,
         name: reg.contact_name,
         registrationCode: reg.code,
         contactPhone: reg.contact_phone,
-        teamOrigin: (answers.team_name as string) || 'Peserta Mandiri',
-        position: (answers.position as string) || undefined,
+        teamOrigin: origin || 'Peserta Mandiri',
+        position: position !== undefined ? String(position).toUpperCase() : undefined,
       });
     }
   });
@@ -114,20 +152,45 @@ export function extractPlayersFromRegistrations(registrations: Registration[]): 
   return result;
 }
 
+// ==========================================
+// Team generation
+// ==========================================
 /**
- * Splits participants into N balanced teams.
- * If position metadata (GK, DF, MF, FW) exists, ensures Goalkeepers are distributed evenly first.
+ * Mini soccer rule: goalkeepers are spread across teams before anyone else.
+ * Other event types can pass their own predicate or `() => false`.
+ */
+export function isSoccerGoalkeeper(p: PlayerParticipant): boolean {
+  const pos = (p.position || '').toUpperCase();
+  return pos === 'GK' || pos.includes('KIPER') || pos.includes('GOAL');
+}
+
+export interface TeamGenerationOptions {
+  /** Replays the exact same draw for the same participant list. */
+  seed?: string;
+  /** Participants matching this are distributed first, one per team in turn. */
+  spreadFirst?: (p: PlayerParticipant) => boolean;
+}
+
+/**
+ * Splits participants into N balanced teams (sizes differ by at most one).
+ * Players matching `spreadFirst` (default: goalkeepers) are dealt first so
+ * they end up evenly spread. Ties are broken randomly, so no team is
+ * systematically favoured with the extra player.
  */
 export function generateBalancedTeams(
   players: PlayerParticipant[],
   teamCount: number,
-  customTeamNames?: string[]
+  customTeamNames?: string[],
+  options: TeamGenerationOptions = {}
 ): GeneratedTeam[] {
-  if (teamCount <= 0) throw new Error('Jumlah tim minimal 1');
+  if (!Number.isInteger(teamCount) || teamCount <= 0) throw new Error('Jumlah tim minimal 1');
   if (players.length === 0) return [];
 
-  // Initialize teams
-  const safeCount = Math.min(teamCount, Math.max(1, players.length));
+  const random = options.seed ? createSeededRandom(options.seed) : Math.random;
+  const spreadFirst = options.spreadFirst ?? isSoccerGoalkeeper;
+
+  // More teams than players would leave empty teams
+  const safeCount = Math.min(teamCount, players.length);
   const teams: GeneratedTeam[] = [];
 
   for (let i = 0; i < safeCount; i++) {
@@ -144,40 +207,20 @@ export function generateBalancedTeams(
     });
   }
 
-  // Separate Goalkeepers (GK) from other players
-  const goalkeepers: PlayerParticipant[] = [];
-  const outfieldPlayers: PlayerParticipant[] = [];
+  // Sort first so the result depends only on who participates, not on the
+  // order registrations were loaded in.
+  const ordered = [...players].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const priority = shuffleArray(ordered.filter(spreadFirst), random);
+  const others = shuffleArray(ordered.filter((p) => !spreadFirst(p)), random);
 
-  players.forEach((p) => {
-    const pos = (p.position || '').toUpperCase();
-    if (pos === 'GK' || pos.includes('KIPER') || pos.includes('GOAL')) {
-      goalkeepers.push(p);
-    } else {
-      outfieldPlayers.push(p);
-    }
-  });
+  const assign = (player: PlayerParticipant) => {
+    const minSize = Math.min(...teams.map((t) => t.players.length));
+    const candidates = teams.filter((t) => t.players.length === minSize);
+    candidates[Math.floor(random() * candidates.length)].players.push(player);
+  };
 
-  // Shuffle both groups
-  const shuffledGKs = shuffleArray(goalkeepers);
-  const shuffledOutfield = shuffleArray(outfieldPlayers);
-
-  // Distribute GKs round-robin across teams
-  shuffledGKs.forEach((gk, index) => {
-    const teamIndex = index % safeCount;
-    teams[teamIndex].players.push(gk);
-  });
-
-  // Distribute outfield players round-robin, starting from team with fewest players
-  shuffledOutfield.forEach((player) => {
-    // Find team with minimum players
-    let minTeamIndex = 0;
-    for (let i = 1; i < safeCount; i++) {
-      if (teams[i].players.length < teams[minTeamIndex].players.length) {
-        minTeamIndex = i;
-      }
-    }
-    teams[minTeamIndex].players.push(player);
-  });
+  priority.forEach(assign);
+  others.forEach(assign);
 
   return teams;
 }
@@ -185,11 +228,12 @@ export function generateBalancedTeams(
 /**
  * Generates tournament matchups (bracket / draw) from team names.
  */
-export function generateTournamentDraw(teamNames: string[]): TournamentMatchup[] {
+export function generateTournamentDraw(teamNames: string[], seed?: string): TournamentMatchup[] {
   const cleanTeams = teamNames.map((t) => t.trim()).filter(Boolean);
   if (cleanTeams.length < 2) return [];
 
-  const shuffled = shuffleArray(cleanTeams);
+  const random = seed ? createSeededRandom(seed) : Math.random;
+  const shuffled = shuffleArray([...cleanTeams].sort(), random);
   const matchups: TournamentMatchup[] = [];
 
   let matchNum = 1;
@@ -215,28 +259,51 @@ export function generateTournamentDraw(teamNames: string[]): TournamentMatchup[]
   return matchups;
 }
 
+// ==========================================
+// Announcements
+// ==========================================
+export interface AnnouncementLabels {
+  heading: string;
+  memberLabel: string;
+  closingNote: string;
+}
+
+export const SOCCER_ANNOUNCEMENT_LABELS: AnnouncementLabels = {
+  heading: '⚽ *HASIL DRAWING PEMBAGIAN TIM*',
+  memberLabel: 'Pemain',
+  closingNote: 'Semua pemain dimohon siap di lapangan 15 menit sebelum kick-off. Junjung tinggi sportivitas! 🏆',
+};
+
 /**
  * Formats generated teams into ready-to-send WhatsApp announcement message.
+ * Pass the seed so participants can verify the draw was not hand-picked.
  */
-export function formatTeamsForWhatsApp(eventTitle: string, teams: GeneratedTeam[]): string {
+export function formatTeamsForWhatsApp(
+  eventTitle: string,
+  teams: GeneratedTeam[],
+  options: { seed?: string; labels?: AnnouncementLabels } = {}
+): string {
+  const labels = options.labels ?? SOCCER_ANNOUNCEMENT_LABELS;
   const lines: string[] = [
-    `⚽ *HASIL DRAWING PEMBAGIAN TIM*`,
+    labels.heading,
     `Event: *${eventTitle}*`,
     `Waktu Pengacakan: ${new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())}`,
-    `----------------------------------------`,
   ];
+  if (options.seed) lines.push(`Kode Acak (seed): ${options.seed}`);
+  lines.push(`----------------------------------------`);
 
   teams.forEach((t) => {
-    lines.push(`\n👕 *${t.name.toUpperCase()}* (${t.players.length} Pemain)`);
+    lines.push(`\n👕 *${t.name.toUpperCase()}* (${t.players.length} ${labels.memberLabel})`);
     t.players.forEach((p, idx) => {
       const pos = p.position ? ` [${p.position}]` : '';
-      const no = p.backNumber ? ` #${p.backNumber}` : '';
+      const hasNumber = p.backNumber !== undefined && p.backNumber !== null && String(p.backNumber) !== '';
+      const no = hasNumber ? ` #${p.backNumber}` : '';
       lines.push(`${idx + 1}. ${p.name}${no}${pos}`);
     });
   });
 
   lines.push(`\n----------------------------------------`);
-  lines.push(`Semua pemain dimohon siap di lapangan 15 menit sebelum kick-off. Junjung tinggi sportivitas! 🏆`);
+  lines.push(labels.closingNote);
 
   return lines.join('\n');
 }
