@@ -10,13 +10,17 @@ import { useToast } from '@/components/ui/toast-context';
 import { ArrowLeft, KeyRound, Mail, Sparkles } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
+import { isUsingDatabase } from '@/lib/store';
+
+// Demo credentials only exist when no database is configured
+const DEMO_MODE = !isUsingDatabase();
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [email, setEmail] = useState('admin@evpage.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState(DEMO_MODE ? 'admin@evpage.com' : '');
+  const [password, setPassword] = useState(DEMO_MODE ? 'admin123' : '');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -161,6 +165,7 @@ export default function AdminLoginPage() {
           </div>
 
           {/* Quick Demo Login Pill */}
+          {DEMO_MODE && (
           <div className="mt-5 border-t border-neutral-100 pt-4 dark:border-neutral-800">
             <button
               type="button"
@@ -174,6 +179,7 @@ export default function AdminLoginPage() {
               <span className="text-[11px] text-neutral-400">admin@evpage.com</span>
             </button>
           </div>
+          )}
         </div>
       </div>
 
