@@ -610,18 +610,28 @@ export async function deleteRegistration(id: string): Promise<boolean> {
 export async function checkStatus(code: string, phone: string): Promise<RegistrationStatusResult | null> {
   const cleanCode = code.trim().toUpperCase();
   const cleanPhone = phone.replace(/[^0-9]/g, '');
+  // Both factors are mandatory: codes are sequential and easy to guess
+  if (!cleanCode || !cleanPhone) return null;
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    // Anonymous visitors cannot read registrations under RLS; use the
+    // SECURITY DEFINER lookup from supabase/schema.sql instead.
+    const { data, error } = await supabase.rpc('check_registration_status', {
+      p_code: cleanCode,
+      p_phone: phone,
+    });
+    if (error) throw new Error('Gagal memeriksa status pendaftaran');
+    const row = Array.isArray(data) ? data[0] : data;
+    return (row as RegistrationStatusResult) || null;
+  }
 
   const allRegs = await getAllRegistrations();
   const events = await getAllEvents();
 
   const found = allRegs.find(r => {
     const regCleanPhone = (r.contact_phone || '').replace(/[^0-9]/g, '');
-    const phoneMatches =
-      !cleanPhone ||
-      !regCleanPhone ||
-      regCleanPhone === cleanPhone ||
-      r.contact_phone === phone.trim();
-    return r.code.toUpperCase() === cleanCode && phoneMatches;
+    return r.code.toUpperCase() === cleanCode && regCleanPhone !== '' && regCleanPhone === cleanPhone;
   });
 
   if (!found) return null;
