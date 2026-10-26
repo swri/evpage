@@ -59,6 +59,14 @@ Platform event untuk **peserta** (mendaftar, membayar manual, cek status, meliha
 | Data & akun | per browser | Postgres + Supabase Auth |
 | Login demo | `admin@evpage.com` / `admin123` (berperan super admin) | tidak ada |
 | Hak akses | dicek di UI | **ditegakkan RLS/trigger**; `/admin` dicek di server oleh proxy |
+| Halaman publik (`/`, `/e/[slug]`, `/e/[slug]/teams`) | dimuat di browser | **dirender di server + cache** (lihat di bawah) |
+
+### Rendering & cache halaman publik (mode Supabase)
+- Halaman publik dibaca di server dengan klien Supabase anonim (tanpa cookie) di fungsi `'use cache'` (`src/lib/server/public-cache.ts`). Hasilnya sama untuk semua pengunjung: tampil cepat dan ramah SEO.
+- **Pratinjau link**: `generateMetadata` mengisi judul, deskripsi, dan gambar cover per event. Saat link `/e/<slug>` dibagikan di WhatsApp/Facebook/X, pratinjau menampilkan event tersebut.
+- **Kesegaran data**: cache diperbarui tiap ±1 menit. Setelah penyelenggara menyimpan event, mengubah status pendaftar, atau mempublikasikan undian, cache event itu langsung diperbarui lewat server action (`src/app/actions/public-cache.ts`, hanya untuk user yang login). Sisa kuota bisa tertinggal sampai ±1 menit setelah pendaftaran baru, tetapi kuota tetap dijaga RPC di database.
+- **Tahan gangguan**: bila database tidak bisa dihubungi (termasuk saat build sebelum migrasi dijalankan), halaman otomatis memuat data di browser dan build tidak gagal.
+- Halaman admin sengaja tetap dimuat di browser; keamanannya dijaga RLS dan `src/proxy.ts`.
 
 > Mode demo hanya untuk demo. Aturan peran (kasir/check-in) di mode demo hanya membatasi tombol di UI.
 
@@ -174,6 +182,7 @@ Salin domain hasil deploy (misalnya `https://evpage.vercel.app` atau domain kust
    - Verifikasi pendaftar → check-in → bagi tim → publikasikan.
    - Buka `/e/<slug>/teams` dan `/status`.
 4. Undang panitia lain lewat **Organisasi & Tim**. Mereka mendaftar atau login dengan email yang diundang, lalu menerima undangan di halaman yang sama.
+5. Cek pratinjau link: buka *View Page Source* di `https://<domain>/e/<slug>` dan pastikan ada `<meta property="og:title" ...>`. WhatsApp dan Facebook menyimpan pratinjau cukup lama; untuk memaksa refresh, pakai Facebook Sharing Debugger (<https://developers.facebook.com/tools/debug/>). Gambar cover sebaiknya URL publik `https://` berukuran sekitar 1200×630.
 
 ### Memperbarui aplikasi
 - **Kode**: push ke `main` → Vercel deploy otomatis.
@@ -225,6 +234,8 @@ CI (`.github/workflows/ci.yml`) menjalankan lint, type check, test, dan build.
 ```
 src/
   proxy.ts                 cek sesi Supabase untuk /admin (mode Supabase)
+  app/actions/             server action (refresh cache halaman publik)
+  lib/server/              pembaca data publik di server + cache
   app/
     e/[slug]/              pendaftaran publik; teams/ = pembagian tim
     status/                cek tiket
@@ -280,7 +291,7 @@ registerEventType({
 - Pembayaran tetap manual (tidak ada payment gateway).
 - File yatim (upload yang pendaftarannya gagal) tidak dihapus otomatis; bersihkan lewat tombol pembersihan (lihat *Batas paket gratis & pemeliharaan*).
 - Antarmuka sengaja hanya Bahasa Indonesia.
-- Semua halaman masih client component. Data di mode Supabase dilindungi RLS, bukan oleh server Next.
+- Halaman admin dimuat di browser (data dilindungi RLS); hanya halaman publik yang dirender di server.
 
 ## Deploy
 Lihat **Tutorial Deploy: Supabase + Vercel** di atas.
