@@ -1,4 +1,4 @@
-import { EventItem, OrganizationSettings, Registration, FormField } from '@/types';
+import type { EventItem, OrganizationSettings, Registration, FormField } from '../types/index.ts';
 
 // Default built-in Form Templates
 export const BUILT_IN_TEMPLATES: { id: string; name: string; description: string; template: Partial<EventItem> }[] = [
@@ -37,6 +37,13 @@ export const BUILT_IN_TEMPLATES: { id: string; name: string; description: string
           placeholder: '081234567890',
           helperText: 'Untuk koordinasi teknis pertandingan (Technical Meeting)',
           validation: { required: true }
+        },
+        {
+          id: 'manager_email',
+          type: 'email',
+          label: 'Email Official / Manajer',
+          placeholder: 'official@tim.com',
+          validation: { required: false }
         },
         {
           id: 'jersey_color',
@@ -115,6 +122,14 @@ export const BUILT_IN_TEMPLATES: { id: string; name: string; description: string
           validation: { required: true }
         },
         {
+          id: 'phone',
+          type: 'phone',
+          label: 'Nomor WhatsApp',
+          placeholder: '0812xxxxxxxx',
+          helperText: 'Untuk pengiriman barcode tiket dan link Zoom',
+          validation: { required: true }
+        },
+        {
           id: 'email',
           type: 'email',
           label: 'Email Aktif',
@@ -182,6 +197,21 @@ export const BUILT_IN_TEMPLATES: { id: string; name: string; description: string
           validation: { required: true }
         },
         {
+          id: 'whatsapp_number',
+          type: 'phone',
+          label: 'Nomor WhatsApp',
+          placeholder: '081234567890',
+          helperText: 'Untuk konfirmasi keikutsertaan dan pengumuman',
+          validation: { required: true }
+        },
+        {
+          id: 'email_address',
+          type: 'email',
+          label: 'Email Aktif',
+          placeholder: 'nama@email.com',
+          validation: { required: true }
+        },
+        {
           id: 'birth_date',
           type: 'date',
           label: 'Tanggal Lahir',
@@ -212,6 +242,77 @@ export const BUILT_IN_TEMPLATES: { id: string; name: string; description: string
           label: 'Upload Kartu Identitas (KTP / Kartu Pelajar)',
           helperText: 'Format JPG, PNG, atau PDF (maks. 5MB)',
           validation: { required: true }
+        }
+      ]
+    }
+  },
+  {
+    id: 'community-gathering',
+    name: 'Gathering / Reuni / Fun Run / Fun Walk',
+    description: 'Cocok untuk acara komunitas, family gathering, reuni akbar, dan event jalan sehat / lari santai.',
+    template: {
+      title: 'Grand Gathering & Fun Walk Komunitas 2026',
+      description: 'Ajang silaturahmi akbar komunitas dengan doorprize menarik, jersey eksklusif, dan hiburan panggung.',
+      price_type: 'fixed',
+      price_amount: 100000,
+      quota: 200,
+      prefix_code: 'GGK',
+      location: 'Taman Impian Danau Indah, Jakarta',
+      form_schema: [
+        {
+          id: 'full_name',
+          type: 'text',
+          label: 'Nama Lengkap Peserta',
+          placeholder: 'Sesuai identitas',
+          validation: { required: true }
+        },
+        {
+          id: 'phone',
+          type: 'phone',
+          label: 'Nomor WhatsApp Aktif',
+          placeholder: '081234567890',
+          helperText: 'Untuk pengiriman tiket & nomor peserta',
+          validation: { required: true }
+        },
+        {
+          id: 'email',
+          type: 'email',
+          label: 'Email',
+          placeholder: 'peserta@email.com',
+          validation: { required: true }
+        },
+        {
+          id: 'tshirt_size',
+          type: 'select',
+          label: 'Ukuran Jersey / Kaos Acara',
+          options: [
+            { label: 'S (Lebar 48cm, Panjang 68cm)', value: 'S' },
+            { label: 'M (Lebar 50cm, Panjang 70cm)', value: 'M' },
+            { label: 'L (Lebar 52cm, Panjang 72cm)', value: 'L' },
+            { label: 'XL (Lebar 54cm, Panjang 74cm)', value: 'XL' },
+            { label: 'XXL (Lebar 56cm, Panjang 76cm)', value: 'XXL' }
+          ],
+          validation: { required: true }
+        },
+        {
+          id: 'emergency_contact',
+          type: 'text',
+          label: 'Nama & No. Kontak Darurat',
+          placeholder: 'Ibu Budi - 081298765432',
+          helperText: 'Hubungan keluarga atau teman terdekat',
+          validation: { required: true }
+        },
+        {
+          id: 'blood_type',
+          type: 'select',
+          label: 'Golongan Darah (Opsional)',
+          options: [
+            { label: 'A', value: 'A' },
+            { label: 'B', value: 'B' },
+            { label: 'AB', value: 'AB' },
+            { label: 'O', value: 'O' },
+            { label: 'Tidak Tahu', value: 'unknown' }
+          ]
         }
       ]
     }
@@ -258,6 +359,8 @@ Turnamen terbuka untuk instansi swasta, BUMN, dan komunitas umum se-Jabodetabek.
     wa_template: 'Halo Panitia *{event}*, saya telah mendaftar.\n\nKode Pendaftaran: *{kode}*\nNama Tim: *{nama}*\nTotal Biaya: *Rp {total}*\nBukti Bayar: {bukti}\n\nMohon konfirmasi dan verifikasi pendaftaran kami. Terima kasih!',
     success_message: 'Pendaftaran tim Anda berhasil diterima sistem! Silakan lakukan konfirmasi WhatsApp dan persiapkan berkas tim sebelum Technical Meeting.',
     status: 'open',
+    organizer_name: 'Panitia Mini Soccer (Budi Pratama)',
+    created_by: 'admin-demo-uuid-1',
     created_at: '2026-10-01T10:00:00Z',
     updated_at: '2026-10-01T10:00:00Z'
   },
@@ -285,6 +388,8 @@ Konferensi sehari penuh membahas integrasi LLM, WebAssembly, Server Components, 
     wa_template: 'Halo Admin *{event}*, saya telah melakukan pembayaran seminar.\n\nKode Pendaftaran: *{kode}*\nNama Peserta: *{nama}*\nTotal Bayar: *Rp {total}*\nBukti: {bukti}\n\nMohon verifikasi pendaftaran saya.',
     success_message: 'Pendaftaran berhasil! E-tiket dan barcode masuk akan dikirimkan setelah panitia memverifikasi pembayaran Anda.',
     status: 'open',
+    organizer_name: 'TechDev Community',
+    created_by: 'admin-demo-uuid-1',
     created_at: '2026-10-05T12:00:00Z',
     updated_at: '2026-10-05T12:00:00Z'
   },
@@ -306,6 +411,8 @@ Ajang unjuk kemampuan seni visual dan desain komunikasi grafis. Terbuka untuk pe
     wa_template: 'Halo Panitia *{event}*, ini konfirmasi pendaftaran lomba saya:\n\nKode: *{kode}*\nNama: *{nama}*\nNominal: *Rp {total}*\nBukti: {bukti}',
     success_message: 'Pendaftaran lomba berhasil dicatat! Simpan kode pendaftaran Anda untuk pengecekan status karya.',
     status: 'open',
+    organizer_name: 'Kreatif Visual ID',
+    created_by: 'admin-demo-uuid-1',
     created_at: '2026-10-10T09:00:00Z',
     updated_at: '2026-10-10T09:00:00Z'
   }

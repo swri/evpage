@@ -4,8 +4,20 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getAllEvents, getOrganizationSettings, formatRupiah, formatIndoDate } from '@/lib/store';
 import { EventItem, OrganizationSettings } from '@/types';
-import { Calendar, MapPin, Users, ArrowRight, ShieldCheck, Search, Sparkles, CheckCircle2 } from 'lucide-react';
+import {
+  Calendar,
+  MapPin,
+  Users,
+  ArrowRight,
+  ShieldCheck,
+  Search,
+  Sparkles,
+  Building2,
+  X,
+  RotateCcw,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
 
@@ -14,12 +26,27 @@ export default function HomePage() {
   const [settings, setSettings] = useState<OrganizationSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Search & Filter State
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [selectedOrganizer, setSelectedOrganizer] = useState('all');
+  const [selectedPriceFilter, setSelectedPriceFilter] = useState<'all' | 'free' | 'paid'>('all');
+
+  // Debounce search input by 300ms to avoid unnecessary load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchInput);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   useEffect(() => {
     async function loadData() {
       try {
         const [evts, orgSettings] = await Promise.all([
           getAllEvents(),
-          getOrganizationSettings()
+          getOrganizationSettings(),
         ]);
         setEvents(evts);
         setSettings(orgSettings);
@@ -32,7 +59,55 @@ export default function HomePage() {
     loadData();
   }, []);
 
-  const openEvents = events.filter(e => e.status === 'open');
+  const openEvents = events.filter((e) => e.status === 'open');
+
+  // Dynamically extract unique organizer names from open events
+  const availableOrganizers = Array.from(
+    new Set(
+      openEvents
+        .map((e) => e.organizer_name?.trim())
+        .filter((name): name is string => Boolean(name && name.length > 0))
+    )
+  ).sort();
+
+  // Filtered Events with debounced query and organizer/price filter
+  const filteredEvents = openEvents.filter((event) => {
+    // 1. Debounced Text Search
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase().trim();
+      const titleMatch = event.title.toLowerCase().includes(q);
+      const organizerMatch = (event.organizer_name || '').toLowerCase().includes(q);
+      const locationMatch = (event.location || '').toLowerCase().includes(q);
+      if (!titleMatch && !organizerMatch && !locationMatch) return false;
+    }
+
+    // 2. Organizer Filter
+    if (selectedOrganizer !== 'all') {
+      if ((event.organizer_name || '').trim() !== selectedOrganizer) {
+        return false;
+      }
+    }
+
+    // 3. Price Filter
+    if (selectedPriceFilter === 'free') {
+      if (event.price_type !== 'free' && event.price_amount > 0) return false;
+    } else if (selectedPriceFilter === 'paid') {
+      if (event.price_type === 'free' || event.price_amount === 0) return false;
+    }
+
+    return true;
+  });
+
+  const hasActiveFilters = Boolean(
+    searchInput.trim() || selectedOrganizer !== 'all' || selectedPriceFilter !== 'all'
+  );
+
+  const handleResetFilters = () => {
+    setSearchInput('');
+    setDebouncedQuery('');
+    setSelectedOrganizer('all');
+    setSelectedPriceFilter('all');
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fafaf9] dark:bg-[#09090b]">
@@ -68,7 +143,7 @@ export default function HomePage() {
       {/* Main Content */}
       <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
         {/* Hero Section */}
-        <div className="mb-8 sm:mb-12 border-b border-neutral-200 pb-6 sm:pb-10 dark:border-neutral-800">
+        <div className="mb-8 sm:mb-10 border-b border-neutral-200 pb-6 sm:pb-8 dark:border-neutral-800">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1 text-[11px] sm:text-xs font-medium text-neutral-600 shadow-2xs dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 mb-3 sm:mb-4">
             <Sparkles className="h-3.5 w-3.5 text-amber-500" />
             <span>Pendaftaran Event Resmi & Pembayaran Terverifikasi</span>
@@ -77,21 +152,126 @@ export default function HomePage() {
             Event & Pendaftaran Terbuka
           </h1>
           <p className="mt-2 text-xs sm:text-base text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed">
-            Pilih event di bawah untuk mengisi formulir pendaftaran, unggah bukti pembayaran, dan dapatkan konfirmasi instan melalui WhatsApp.
+            Temukan berbagai event resmi dari ragam penyelenggara terpercaya. Pilih event untuk mengisi formulir pendaftaran dan konfirmasi instan via WhatsApp.
           </p>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="mb-8 rounded-2xl border border-neutral-200/90 bg-white p-3.5 sm:p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 space-y-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            {/* Search Input with Debounce */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 dark:text-neutral-500" />
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Cari nama event, penyelenggara, atau lokasi..."
+                className="w-full h-10 pl-9.5 pr-8 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-100 dark:focus:bg-neutral-900 dark:focus:ring-neutral-100/10 dark:focus:border-neutral-100 transition-all"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput('')}
+                  aria-label="Hapus pencarian"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Penyelenggara Dropdown */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:w-56">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+                <select
+                  value={selectedOrganizer}
+                  onChange={(e) => setSelectedOrganizer(e.target.value)}
+                  className="w-full h-10 pl-8 pr-7 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs text-neutral-800 focus:bg-white focus:outline-hidden focus:border-neutral-900 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-200 dark:focus:bg-neutral-900 dark:focus:border-neutral-100 cursor-pointer appearance-none transition-all truncate"
+                >
+                  <option value="all">Semua Penyelenggara ({availableOrganizers.length})</option>
+                  {availableOrganizers.map((org) => (
+                    <option key={org} value={org}>
+                      {org}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-400 text-[10px]">
+                  ▼
+                </div>
+              </div>
+
+              {/* Filter Tipe Biaya Dropdown */}
+              <select
+                value={selectedPriceFilter}
+                onChange={(e) => setSelectedPriceFilter(e.target.value as 'all' | 'free' | 'paid')}
+                className="h-10 px-3 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs text-neutral-800 focus:bg-white focus:outline-hidden focus:border-neutral-900 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-200 dark:focus:bg-neutral-900 dark:focus:border-neutral-100 cursor-pointer transition-all shrink-0"
+              >
+                <option value="all">Semua Biaya</option>
+                <option value="free">Gratis</option>
+                <option value="paid">Berbayar</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Active Filter Indicators & Reset Button */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800/60 text-xs text-neutral-500">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-neutral-400">Filter Aktif:</span>
+                {debouncedQuery && (
+                  <Badge variant="outline" className="text-[10px] gap-1 py-0.5">
+                    <span>Cari: &ldquo;{debouncedQuery}&rdquo;</span>
+                    <button type="button" onClick={() => setSearchInput('')}>
+                      <X className="h-2.5 w-2.5 ml-0.5" />
+                    </button>
+                  </Badge>
+                )}
+                {selectedOrganizer !== 'all' && (
+                  <Badge variant="outline" className="text-[10px] gap-1 py-0.5">
+                    <span>Penyelenggara: {selectedOrganizer}</span>
+                    <button type="button" onClick={() => setSelectedOrganizer('all')}>
+                      <X className="h-2.5 w-2.5 ml-0.5" />
+                    </button>
+                  </Badge>
+                )}
+                {selectedPriceFilter !== 'all' && (
+                  <Badge variant="outline" className="text-[10px] gap-1 py-0.5">
+                    <span>Biaya: {selectedPriceFilter === 'free' ? 'Gratis' : 'Berbayar'}</span>
+                    <button type="button" onClick={() => setSelectedPriceFilter('all')}>
+                      <X className="h-2.5 w-2.5 ml-0.5" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>Atur Ulang Filter</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Events Grid */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-              Daftar Event Tersedia ({openEvents.length})
+            <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+              <span>Daftar Event Tersedia</span>
+              <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
+                ({filteredEvents.length} dari {openEvents.length} event)
+              </span>
             </h2>
             <Link
               href="/status"
               className="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 underline underline-offset-4"
             >
-              Sudah pernah daftar? Periksa status disini
+              Cek Tiket / Status
             </Link>
           </div>
 
@@ -104,19 +284,29 @@ export default function HomePage() {
                 />
               ))}
             </div>
-          ) : openEvents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-neutral-300 p-12 text-center dark:border-neutral-700 bg-white dark:bg-neutral-900">
-              <Users className="mx-auto h-10 w-10 text-neutral-400" />
-              <h3 className="mt-4 text-base font-medium text-neutral-900 dark:text-neutral-100">
-                Belum ada pendaftaran event yang dibuka
+          ) : filteredEvents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-neutral-300 p-10 sm:p-14 text-center dark:border-neutral-700 bg-white dark:bg-neutral-900">
+              <Search className="mx-auto h-8 w-8 text-neutral-400 mb-2" />
+              <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                Tidak ada event yang cocok
               </h3>
-              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-                Kunjungi kembali nanti atau hubungi panitia untuk informasi selanjutnya.
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">
+                {hasActiveFilters
+                  ? 'Coba gunakan kata kunci pencarian lain atau klik tombol atur ulang filter di bawah.'
+                  : 'Belum ada pendaftaran event yang dibuka saat ini.'}
               </p>
+              {hasActiveFilters && (
+                <div className="mt-4">
+                  <Button size="sm" variant="outline" onClick={handleResetFilters} className="text-xs gap-1.5">
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Reset Pencarian & Filter</span>
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-6">
-              {openEvents.map((event) => {
+              {filteredEvents.map((event) => {
                 const isFree = event.price_type === 'free' || event.price_amount === 0;
                 const remainingQuota = Math.max(0, event.quota - (event.total_registrations || 0));
 
@@ -146,8 +336,19 @@ export default function HomePage() {
                           {event.title}
                         </h3>
 
-                        {/* Location & Date */}
+                        {/* Organizer, Location & Date */}
                         <div className="mt-2 sm:mt-3.5 space-y-1 sm:space-y-2 text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400">
+                          {/* Penyelenggara (Akun Admin) */}
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <Building2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+                            <span className="line-clamp-1">
+                              Penyelenggara:{' '}
+                              <strong className="font-semibold text-neutral-800 dark:text-neutral-200">
+                                {event.organizer_name || 'Panitia Resmi'}
+                              </strong>
+                            </span>
+                          </div>
+
                           {event.starts_at && (
                             <div className="flex items-center gap-1.5 sm:gap-2">
                               <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />

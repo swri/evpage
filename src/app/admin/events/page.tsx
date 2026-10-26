@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getAllEvents, duplicateEvent, deleteEvent, formatRupiah, formatIndoDate } from '@/lib/store';
+import { getAllEvents, duplicateEvent, deleteEvent, formatRupiah } from '@/lib/store';
+import { getCurrentAdminSession } from '@/lib/auth';
 import { EventItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,19 +16,23 @@ import {
   Settings2,
   FileSpreadsheet,
   ExternalLink,
-  Users,
 } from 'lucide-react';
 
 export default function AdminEventsPage() {
   const { toast } = useToast();
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const session = getCurrentAdminSession();
+  const currentUserId = session?.user?.id;
+  const isSuperAdmin = session?.user?.email === 'admin@evpage.com';
+
+  const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewScope, setViewScope] = useState<'mine' | 'all'>('mine');
 
   const loadData = async () => {
     setLoading(true);
     try {
       const evts = await getAllEvents();
-      setEvents(evts);
+      setAllEvents(evts);
     } catch (err) {
       console.error('Failed to load events:', err);
     } finally {
@@ -39,19 +44,26 @@ export default function AdminEventsPage() {
     loadData();
   }, []);
 
+  const events = isSuperAdmin && viewScope === 'all'
+    ? allEvents
+    : allEvents.filter(
+        (e) => e.created_by === currentUserId || (!e.created_by && isSuperAdmin)
+      );
+
   const handleDuplicate = async (id: string, title: string) => {
     try {
-      const duplicated = await duplicateEvent(id);
+      await duplicateEvent(id);
       toast({
         type: 'success',
         title: 'Event Berhasil Diduplikasi',
         message: `Salinan "${title}" telah dibuat dengan status Draft.`,
       });
       loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Gagal menduplikasi event';
       toast({
         type: 'error',
-        message: err.message || 'Gagal menduplikasi event',
+        message,
       });
     }
   };
@@ -68,10 +80,11 @@ export default function AdminEventsPage() {
         message: `Event "${title}" berhasil dihapus.`,
       });
       loadData();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Gagal menghapus event';
       toast({
         type: 'error',
-        message: err.message || 'Gagal menghapus event',
+        message,
       });
     }
   };
@@ -89,12 +102,41 @@ export default function AdminEventsPage() {
           </p>
         </div>
 
-        <Link href="/admin/events/new">
-          <Button className="h-9 text-xs font-semibold gap-1.5 shadow-xs">
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span>Buat Event Baru</span>
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <div className="flex items-center rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 text-xs dark:border-neutral-700 dark:bg-neutral-800">
+              <button
+                type="button"
+                onClick={() => setViewScope('mine')}
+                className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  viewScope === 'mine'
+                    ? 'bg-white shadow-2xs text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
+                }`}
+              >
+                Event Saya
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewScope('all')}
+                className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  viewScope === 'all'
+                    ? 'bg-white shadow-2xs text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
+                }`}
+              >
+                Semua Penyelenggara
+              </button>
+            </div>
+          )}
+
+          <Link href="/admin/events/new">
+            <Button className="h-9 text-xs font-semibold gap-1.5 shadow-xs">
+              <PlusCircle className="h-3.5 w-3.5" />
+              <span>Buat Event Baru</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Events Table / Grid */}
@@ -160,6 +202,12 @@ export default function AdminEventsPage() {
                       Harga:{' '}
                       <strong className="text-neutral-800 dark:text-neutral-200">
                         {evt.price_type === 'free' ? 'Gratis' : formatRupiah(evt.price_amount)}
+                      </strong>
+                    </span>
+                    <span>
+                      Penyelenggara:{' '}
+                      <strong className="text-neutral-800 dark:text-neutral-200">
+                        {evt.organizer_name || 'Panitia Resmi'}
                       </strong>
                     </span>
                     <span>

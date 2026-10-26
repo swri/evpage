@@ -65,16 +65,22 @@ export interface OrganizationSettings {
 }
 
 export interface EventContactConfig {
+  enabled?: boolean;
   title?: string;
   description?: string;
+  name_enabled?: boolean;
+  name_required?: boolean;
   name_label?: string;
   name_placeholder?: string;
+  phone_enabled?: boolean;
+  phone_required?: boolean;
   phone_label?: string;
   phone_placeholder?: string;
   phone_helper?: string;
+  email_enabled?: boolean;
+  email_required?: boolean;
   email_label?: string;
   email_placeholder?: string;
-  email_required?: boolean;
 }
 
 export interface EventItem {
@@ -97,6 +103,8 @@ export interface EventItem {
   status: EventStatus;
   created_at: string;
   updated_at: string;
+  organizer_name?: string;
+  created_by?: string;
   // Computed / aggregated fields
   total_registrations?: number;
   verified_registrations?: number;

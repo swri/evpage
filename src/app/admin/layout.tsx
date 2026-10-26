@@ -17,7 +17,6 @@ import {
   LogOut,
   Menu,
   X,
-  Layers,
   ChevronRight,
 } from 'lucide-react';
 
@@ -26,15 +25,19 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const [orgSettings, setOrgSettings] = useState<OrganizationSettings | null>(null);
-  const [adminUser, setAdminUser] = useState<any>(null);
+  const [adminUser, setAdminUser] = useState<{
+    id: string;
+    email: string;
+    full_name: string;
+    organization_name?: string;
+  } | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const isLoginPage = pathname === '/admin/login';
+  const isAuthPage = pathname === '/admin/login' || pathname === '/admin/register';
 
   useEffect(() => {
-    if (isLoginPage) {
-      setAuthChecked(true);
+    if (isAuthPage) {
       return;
     }
 
@@ -48,10 +51,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     setAuthChecked(true);
 
     getOrganizationSettings().then(setOrgSettings);
-  }, [pathname, isLoginPage, router]);
+  }, [pathname, isAuthPage, router]);
 
-  // If on login page, render children without sidebar
-  if (isLoginPage) {
+  // If on auth pages (login / register), render children without sidebar
+  if (isAuthPage) {
     return <>{children}</>;
   }
 

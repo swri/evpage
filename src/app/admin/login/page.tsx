@@ -7,7 +7,7 @@ import { loginAdmin, getCurrentAdminSession } from '@/lib/auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-context';
-import { ShieldCheck, ArrowLeft, KeyRound, Mail, Sparkles } from 'lucide-react';
+import { ArrowLeft, KeyRound, Mail, Sparkles } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
 
@@ -45,8 +45,9 @@ export default function AdminLoginPage() {
       } else {
         setErrorMessage(res.error || 'Login gagal. Periksa kembali email dan password.');
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Terjadi kesalahan sistem.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Terjadi kesalahan sistem.';
+      setErrorMessage(message);
     } finally {
       setIsLoading(false);
     }
@@ -146,8 +147,21 @@ export default function AdminLoginPage() {
             </Button>
           </form>
 
+          {/* Link to Register New Admin */}
+          <div className="mt-5 text-center">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Belum punya akun admin?{' '}
+              <Link
+                href="/admin/register"
+                className="font-semibold text-neutral-900 underline underline-offset-4 hover:text-neutral-700 dark:text-neutral-100 dark:hover:text-neutral-300"
+              >
+                Daftar Akun Baru
+              </Link>
+            </p>
+          </div>
+
           {/* Quick Demo Login Pill */}
-          <div className="mt-6 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+          <div className="mt-5 border-t border-neutral-100 pt-4 dark:border-neutral-800">
             <button
               type="button"
               onClick={fillDemoCredentials}

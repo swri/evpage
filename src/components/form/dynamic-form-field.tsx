@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { FormField, FieldOption } from '@/types';
+import { FormField } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Upload, AlertCircle, FileText, Check } from 'lucide-react';
+import { Plus, Trash2, Upload, AlertCircle, FileText } from 'lucide-react';
 
 interface DynamicFormFieldProps {
   field: FormField;
@@ -289,7 +289,7 @@ export function DynamicFormField({
           </div>
         );
 
-      case 'repeater':
+      case 'repeater': {
         const rows: any[] = Array.isArray(value) ? value : [];
         const minRows = validation?.min ?? 1;
         const maxRows = validation?.max ?? 20;
@@ -402,6 +402,7 @@ export function DynamicFormField({
             </div>
           </div>
         );
+      }
 
       default:
         return null;

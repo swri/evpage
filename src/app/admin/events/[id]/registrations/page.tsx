@@ -11,7 +11,7 @@ import {
   formatRupiah,
   formatIndoDate,
 } from '@/lib/store';
-import { EventItem, Registration, FormField } from '@/types';
+import { EventItem, Registration } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -24,20 +24,19 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   XCircle,
-  Clock,
   Trash2,
   Edit,
   Eye,
   MessageSquare,
   ExternalLink,
-  Filter,
   CheckSquare,
   Square,
   Save,
   AlertTriangle,
-  FileText,
+  Shuffle,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 function EventRegistrationsContent({
   params,
@@ -74,6 +73,9 @@ function EventRegistrationsContent({
   // Status note inside drawer
   const [drawerNote, setDrawerNote] = useState('');
   const [drawerStatus, setDrawerStatus] = useState<'pending' | 'verified' | 'rejected'>('pending');
+
+  // Random team & tournament draw modal
+  const [randomTeamOpen, setRandomTeamOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -425,8 +427,19 @@ function EventRegistrationsContent({
           </p>
         </div>
 
-        {/* Export Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRandomTeamOpen(true)}
+            className="h-8 text-xs gap-1.5 shadow-2xs border-emerald-500/40 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-600/40 dark:text-emerald-400 dark:hover:bg-emerald-950/30 font-medium"
+            title="Bagi tim acak dan buat bagan turnamen dari peserta terdaftar"
+          >
+            <Shuffle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Acak Tim / Drawing</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -1092,6 +1105,14 @@ function EventRegistrationsContent({
           </div>
         </div>
       </Dialog>
+
+      {/* Random Team & Tournament Draw Modal */}
+      <RandomTeamModal
+        open={randomTeamOpen}
+        onOpenChange={setRandomTeamOpen}
+        eventTitle={event?.title || 'Event'}
+        registrations={registrations}
+      />
     </div>
   );
 }

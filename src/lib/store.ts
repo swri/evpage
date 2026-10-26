@@ -1,5 +1,5 @@
-import { EventItem, OrganizationSettings, Registration, RegistrationStatusResult, FormField } from '@/types';
-import { INITIAL_EVENTS, INITIAL_ORGANIZATION_SETTINGS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service';
+import type { EventItem, OrganizationSettings, Registration, RegistrationStatusResult } from '../types/index.ts';
+import { INITIAL_EVENTS, INITIAL_ORGANIZATION_SETTINGS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service.ts';
 
 export { formatRupiah, formatIndoDate };
 
@@ -43,25 +43,39 @@ function setStorage<T>(key: string, value: T): void {
 }
 
 // ==========================================
-// Organization Settings API
+// Organization Settings API (Multi-tenant scoped per organizer)
 // ==========================================
-export async function getOrganizationSettings(): Promise<OrganizationSettings> {
+export async function getOrganizationSettings(organizerId?: string): Promise<OrganizationSettings> {
   if (isBrowser) {
+    if (organizerId) {
+      const scopedKey = `${STORAGE_KEYS.SETTINGS}_${organizerId}`;
+      const scoped = getStorage<OrganizationSettings | null>(scopedKey, null);
+      if (scoped) return scoped;
+    }
     return getStorage<OrganizationSettings>(STORAGE_KEYS.SETTINGS, memorySettings);
   }
   return memorySettings;
 }
 
-export async function updateOrganizationSettings(settings: Partial<OrganizationSettings>): Promise<OrganizationSettings> {
-  const current = await getOrganizationSettings();
+export async function updateOrganizationSettings(
+  settings: Partial<OrganizationSettings>,
+  organizerId?: string
+): Promise<OrganizationSettings> {
+  const current = await getOrganizationSettings(organizerId);
   const updated: OrganizationSettings = {
     ...current,
     ...settings,
     updated_at: new Date().toISOString()
   };
-  memorySettings = updated;
   if (isBrowser) {
-    setStorage(STORAGE_KEYS.SETTINGS, updated);
+    if (organizerId) {
+      setStorage(`${STORAGE_KEYS.SETTINGS}_${organizerId}`, updated);
+    } else {
+      setStorage(STORAGE_KEYS.SETTINGS, updated);
+      memorySettings = updated;
+    }
+  } else {
+    memorySettings = updated;
   }
   return updated;
 }
@@ -121,7 +135,11 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
     const updated: EventItem = {
       ...currentEvents[index],
       ...eventData,
-      updated_at: now
+      organizer_name:
+        eventData.organizer_name !== undefined
+          ? eventData.organizer_name
+          : currentEvents[index].organizer_name || 'Panitia Resmi',
+      updated_at: now,
     };
     currentEvents[index] = updated;
     memoryEvents = currentEvents;
@@ -156,6 +174,8 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       price_type: eventData.price_type || 'fixed',
       price_amount: eventData.price_amount ?? 0,
       prefix_code: (eventData.prefix_code || 'EVT').toUpperCase().slice(0, 5),
+      organizer_name: eventData.organizer_name || 'Panitia Resmi',
+      created_by: eventData.created_by,
       contact_config: eventData.contact_config,
       form_schema: eventData.form_schema || [],
       wa_template: eventData.wa_template || 'Halo Admin, saya telah mendaftar di *{event}*.\n\nKode Pendaftaran: *{kode}*\nNama: *{nama}*\nTotal Bayar: *Rp {total}*\nBukti: {bukti}',
@@ -356,8 +376,13 @@ export async function checkStatus(code: string, phone: string): Promise<Registra
   const events = await getAllEvents();
 
   const found = allRegs.find(r => {
-    const regCleanPhone = r.contact_phone.replace(/[^0-9]/g, '');
-    return r.code.toUpperCase() === cleanCode && (regCleanPhone === cleanPhone || r.contact_phone === phone.trim());
+    const regCleanPhone = (r.contact_phone || '').replace(/[^0-9]/g, '');
+    const phoneMatches =
+      !cleanPhone ||
+      !regCleanPhone ||
+      regCleanPhone === cleanPhone ||
+      r.contact_phone === phone.trim();
+    return r.code.toUpperCase() === cleanCode && phoneMatches;
   });
 
   if (!found) return null;
@@ -394,7 +419,7 @@ export function buildWhatsAppLink(
     phone = '62' + phone.slice(1);
   }
 
-  let text = template
+  const text = template
     .replace(/{event}/g, data.event)
     .replace(/{kode}/g, data.kode)
     .replace(/{nama}/g, data.nama)

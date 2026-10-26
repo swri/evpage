@@ -13,7 +13,6 @@ import {
 import { EventItem, OrganizationSettings, Registration } from '@/types';
 import { DynamicFormField } from '@/components/form/dynamic-form-field';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
@@ -51,9 +50,6 @@ function EventRegistrationContent({
   const [loading, setLoading] = useState(true);
 
   // Form State
-  const [contactName, setContactName] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [paymentProofName, setPaymentProofName] = useState<string>('');
@@ -70,10 +66,8 @@ function EventRegistrationContent({
   useEffect(() => {
     async function loadEventData() {
       try {
-        const [evt, settings] = await Promise.all([
-          getEventBySlug(slug),
-          getOrganizationSettings(),
-        ]);
+        const evt = await getEventBySlug(slug);
+        const settings = await getOrganizationSettings(evt?.created_by);
         setEvent(evt);
         setOrgSettings(settings);
 
@@ -83,7 +77,7 @@ function EventRegistrationContent({
           evt.form_schema.forEach((field) => {
             if (field.type === 'repeater') {
               const minRows = field.validation?.min ?? 1;
-              const rows = [];
+              const rows: Record<string, any>[] = [];
               for (let i = 0; i < minRows; i++) {
                 const rowObj: Record<string, any> = {};
                 field.subFields?.forEach((sf) => {
@@ -185,27 +179,7 @@ function EventRegistrationContent({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // Primary Contact Validation
-    const nameLbl = event.contact_config?.name_label || 'Nama kontak';
-    const phoneLbl = event.contact_config?.phone_label || 'Nomor WhatsApp';
-    const emailLbl = event.contact_config?.email_label || 'Email';
-    const isEmailReq = event.contact_config?.email_required ?? true;
-
-    if (!contactName.trim()) {
-      newErrors['contact_name'] = `${nameLbl} wajib diisi.`;
-    }
-    if (!contactPhone.trim()) {
-      newErrors['contact_phone'] = `${phoneLbl} wajib diisi.`;
-    } else if (!/^[0-9+\-\s]{8,16}$/.test(contactPhone.trim())) {
-      newErrors['contact_phone'] = `Format ${phoneLbl} tidak valid.`;
-    }
-    if (isEmailReq && !contactEmail.trim()) {
-      newErrors['contact_email'] = `${emailLbl} wajib diisi.`;
-    } else if (contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
-      newErrors['contact_email'] = `Format ${emailLbl} tidak valid.`;
-    }
-
-    // Dynamic Fields Validation
+    // Validate all dynamic fields uniformly (Google Form style)
     event.form_schema.forEach((field) => {
       const val = answers[field.id];
       const isReq = field.validation?.required;
@@ -227,6 +201,18 @@ function EventRegistrationContent({
       } else if (field.type === 'checkbox') {
         if (isReq && (!Array.isArray(val) || val.length === 0)) {
           newErrors[field.id] = `${field.label} wajib dicentang.`;
+        }
+      } else if (field.type === 'email') {
+        if (isReq && (!val || String(val).trim() === '')) {
+          newErrors[field.id] = `${field.label} wajib diisi.`;
+        } else if (val && String(val).trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(val).trim())) {
+          newErrors[field.id] = `Format ${field.label} tidak valid.`;
+        }
+      } else if (field.type === 'phone') {
+        if (isReq && (!val || String(val).trim() === '')) {
+          newErrors[field.id] = `${field.label} wajib diisi.`;
+        } else if (val && String(val).trim() && !/^[0-9+\-\s]{8,16}$/.test(String(val).trim())) {
+          newErrors[field.id] = `Format ${field.label} tidak valid (8-16 digit angka).`;
         }
       } else if (isReq && (val === undefined || val === null || String(val).trim() === '')) {
         newErrors[field.id] = `${field.label} wajib diisi.`;
@@ -269,12 +255,36 @@ function EventRegistrationContent({
 
     setIsSubmitting(true);
     try {
+      // Auto-detect contact info for ticket lookup & WhatsApp notifications
+      const phoneField = event.form_schema.find(
+        (f) =>
+          f.type === 'phone' ||
+          /phone|wa|whatsapp/i.test(f.id) ||
+          /whatsapp|telepon|hp/i.test(f.label)
+      );
+      const emailField = event.form_schema.find(
+        (f) => f.type === 'email' || /email/i.test(f.id) || /email/i.test(f.label)
+      );
+      const nameField =
+        event.form_schema.find(
+          (f) => /name|nama|pic|leader|ketua/i.test(f.id) || /nama/i.test(f.label)
+        ) || event.form_schema.find((f) => f.type === 'text');
+
+      const detectedName =
+        (nameField && answers[nameField.id] ? String(answers[nameField.id]).trim() : '') ||
+        Object.values(answers).find((v) => typeof v === 'string' && v.trim().length > 0) ||
+        'Pendaftar';
+      const detectedPhone =
+        (phoneField && answers[phoneField.id] ? String(answers[phoneField.id]).trim() : '') || '-';
+      const detectedEmail =
+        (emailField && answers[emailField.id] ? String(answers[emailField.id]).trim() : '') || '-';
+
       const newRegistration = await createRegistration({
         event_id: event.id,
         answers,
-        contact_name: contactName.trim(),
-        contact_phone: contactPhone.trim(),
-        contact_email: contactEmail.trim(),
+        contact_name: detectedName,
+        contact_phone: detectedPhone,
+        contact_email: detectedEmail,
         payment_proof_path: paymentProof || undefined,
         total_amount: totalCost,
       });
@@ -296,11 +306,12 @@ function EventRegistrationContent({
 
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Terjadi kesalahan sistem saat menyimpan pendaftaran.';
       toast({
         type: 'error',
         title: 'Pendaftaran Gagal',
-        message: err.message || 'Terjadi kesalahan sistem saat menyimpan pendaftaran.',
+        message,
       });
     } finally {
       setIsSubmitting(false);
@@ -605,124 +616,50 @@ function EventRegistrationContent({
                   />
                 </div>
 
-                {/* Section 1: Contact Information */}
+                {/* Registration Form (Unified Google Form style, no sections) */}
                 <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
-                  <div className="mb-4 border-b border-neutral-200 pb-3 dark:border-neutral-800">
+                  <div className="mb-6 border-b border-neutral-200 pb-3 dark:border-neutral-800">
                     <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
-                      {event.contact_config?.title || '1. Informasi Kontak Penanggung Jawab'}
+                      Formulir Pendaftaran
                     </h2>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                      {event.contact_config?.description ||
-                        'Digunakan untuk verifikasi, konfirmasi WhatsApp, dan pengecekan status tiket.'}
+                      Lengkapi seluruh data pendaftaran di bawah ini dengan benar.
                     </p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="contact_name" className="block text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                        {event.contact_config?.name_label || 'Nama Lengkap'} <span className="text-red-500 font-semibold">*</span>
-                      </label>
-                      <Input
-                        id="contact_name"
-                        type="text"
-                        autoComplete="name"
-                        placeholder={event.contact_config?.name_placeholder || 'Contoh: Budi Pratama'}
-                        value={contactName}
-                        onChange={(e) => setContactName(e.target.value)}
-                        className="mt-1"
+                  <div className="space-y-6">
+                    {event.form_schema.map((field) => (
+                      <DynamicFormField
+                        key={field.id}
+                        field={field}
+                        value={answers[field.id]}
+                        onChange={(val) => {
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [field.id]: val,
+                          }));
+                          if (errors[field.id]) {
+                            setErrors((prev) => {
+                              const updated = { ...prev };
+                              delete updated[field.id];
+                              return updated;
+                            });
+                          }
+                        }}
+                        error={errors[field.id]}
                       />
-                      {errors.contact_name && (
-                        <p className="text-xs text-red-600 mt-1">{errors.contact_name}</p>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="contact_phone" className="block text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                          {event.contact_config?.phone_label || 'Nomor WhatsApp'} <span className="text-red-500 font-semibold">*</span>
-                        </label>
-                        <Input
-                          id="contact_phone"
-                          type="tel"
-                          inputMode="tel"
-                          autoComplete="tel"
-                          placeholder={event.contact_config?.phone_placeholder || '0812xxxxxxxx'}
-                          value={contactPhone}
-                          onChange={(e) => setContactPhone(e.target.value)}
-                          className="mt-1"
-                        />
-                        <p className="text-[11px] text-neutral-400 mt-1">
-                          {event.contact_config?.phone_helper || 'Nomor ini juga digunakan untuk login cek status.'}
-                        </p>
-                        {errors.contact_phone && (
-                          <p className="text-xs text-red-600 mt-1">{errors.contact_phone}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label htmlFor="contact_email" className="block text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                          {event.contact_config?.email_label || 'Email Aktif'}{' '}
-                          {(event.contact_config?.email_required ?? true) && (
-                            <span className="text-red-500 font-semibold">*</span>
-                          )}
-                        </label>
-                        <Input
-                          id="contact_email"
-                          type="email"
-                          inputMode="email"
-                          autoComplete="email"
-                          placeholder={event.contact_config?.email_placeholder || 'nama@email.com'}
-                          value={contactEmail}
-                          onChange={(e) => setContactEmail(e.target.value)}
-                          className="mt-1"
-                        />
-                        {errors.contact_email && (
-                          <p className="text-xs text-red-600 mt-1">{errors.contact_email}</p>
-                        )}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Section 2: Custom Dynamic Fields */}
-                {event.form_schema.length > 0 && (
-                  <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
-                    <div className="mb-4 border-b border-neutral-200 pb-3 dark:border-neutral-800">
-                      <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
-                        2. Formulir Data Pendaftaran
-                      </h2>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                        Lengkapi seluruh informasi data peserta di bawah ini.
-                      </p>
-                    </div>
-
-                    <div className="space-y-6">
-                      {event.form_schema.map((field) => (
-                        <DynamicFormField
-                          key={field.id}
-                          field={field}
-                          value={answers[field.id]}
-                          onChange={(val) => {
-                            setAnswers((prev) => ({
-                              ...prev,
-                              [field.id]: val,
-                            }));
-                          }}
-                          error={errors[field.id]}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Section 3: Payment Section (if not free) */}
+                {/* Payment Section (if not free) */}
                 {event.price_type !== 'free' && (
                   <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900">
                     <div className="mb-4 border-b border-neutral-200 pb-3 dark:border-neutral-800">
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
-                            3. Rincian Biaya & Pembayaran
+                            Rincian Biaya & Pembayaran
                           </h2>
                           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                             Silakan transfer sesuai nominal dan unggah struk bukti transfer.

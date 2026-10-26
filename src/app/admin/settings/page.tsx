@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getOrganizationSettings, updateOrganizationSettings } from '@/lib/store';
-import { OrganizationSettings } from '@/types';
+import { getCurrentAdminSession } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,15 +12,15 @@ import {
   Save,
   Building,
   CreditCard,
-  QrCode,
   MessageSquare,
   Sparkles,
-  CheckCircle2,
-  ExternalLink,
 } from 'lucide-react';
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
+  const session = getCurrentAdminSession();
+  const currentUserId = session?.user?.id;
+
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -36,8 +36,8 @@ export default function AdminSettingsPage() {
   const [instructions, setInstructions] = useState('');
 
   useEffect(() => {
-    getOrganizationSettings().then((settings) => {
-      setName(settings.name);
+    getOrganizationSettings(currentUserId).then((settings) => {
+      setName(settings.name || session?.user?.organization_name || session?.user?.full_name || '');
       setLogoUrl(settings.logo_url || '');
       setAccentColor(settings.accent_color || '#0f172a');
       setWaNumber(settings.wa_number);
@@ -48,35 +48,39 @@ export default function AdminSettingsPage() {
       setInstructions(settings.payment_info.instructions || '');
       setLoading(false);
     });
-  }, []);
+  }, [currentUserId, session]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await updateOrganizationSettings({
-        name: name.trim(),
-        logo_url: logoUrl.trim(),
-        accent_color: accentColor,
-        wa_number: waNumber.trim(),
-        payment_info: {
-          bank_name: bankName.trim(),
-          account_number: accountNumber.trim(),
-          account_holder: accountHolder.trim(),
-          qris_url: qrisUrl.trim(),
-          instructions: instructions.trim(),
+      await updateOrganizationSettings(
+        {
+          name: name.trim(),
+          logo_url: logoUrl.trim(),
+          accent_color: accentColor,
+          wa_number: waNumber.trim(),
+          payment_info: {
+            bank_name: bankName.trim(),
+            account_number: accountNumber.trim(),
+            account_holder: accountHolder.trim(),
+            qris_url: qrisUrl.trim(),
+            instructions: instructions.trim(),
+          },
         },
-      });
+        currentUserId
+      );
 
       toast({
         type: 'success',
         title: 'Pengaturan Disimpan',
-        message: 'Identitas organisasi dan info rekening pembayaran berhasil diperbarui!',
+        message: 'Identitas penyelenggara dan info rekening pembayaran berhasil diperbarui!',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Gagal menyimpan pengaturan.';
       toast({
         type: 'error',
-        message: err.message || 'Gagal menyimpan pengaturan.',
+        message,
       });
     } finally {
       setIsSaving(false);

@@ -4,43 +4,38 @@ import * as React from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from './button';
 
+const emptySubscribe = () => () => {};
+
+function useIsMounted() {
+  return React.useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+}
+
+function subscribeTheme(callback: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+  return () => observer.disconnect();
+}
+
+function getThemeSnapshot() {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.classList.contains('dark');
+}
+
 export function ThemeToggle({ className }: { className?: string }) {
-  const [isDark, setIsDark] = React.useState<boolean>(false);
-  const [mounted, setMounted] = React.useState<boolean>(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-    // Read saved theme or match media
-    const saved = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const shouldBeDark = saved === 'dark' || (!saved && prefersDark);
-
-    if (shouldBeDark) {
-      document.documentElement.classList.add('dark');
-      if (document.body) document.body.classList.add('dark');
-      setIsDark(true);
-    } else {
-      document.documentElement.classList.remove('dark');
-      if (document.body) document.body.classList.remove('dark');
-      setIsDark(false);
-    }
-
-    // Keep sync if class changes externally
-    const observer = new MutationObserver(() => {
-      const darkActive = document.documentElement.classList.contains('dark');
-      setIsDark(darkActive);
-      if (document.body) {
-        if (darkActive) document.body.classList.add('dark');
-        else document.body.classList.remove('dark');
-      }
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
-    return () => observer.disconnect();
-  }, []);
+  const mounted = useIsMounted();
+  const isDark = React.useSyncExternalStore(
+    subscribeTheme,
+    getThemeSnapshot,
+    () => false
+  );
 
   const toggleTheme = () => {
     const root = document.documentElement;
@@ -49,12 +44,10 @@ export function ThemeToggle({ className }: { className?: string }) {
       root.classList.add('dark');
       if (document.body) document.body.classList.add('dark');
       localStorage.setItem('theme', 'dark');
-      setIsDark(true);
     } else {
       root.classList.remove('dark');
       if (document.body) document.body.classList.remove('dark');
       localStorage.setItem('theme', 'light');
-      setIsDark(false);
     }
   };
 

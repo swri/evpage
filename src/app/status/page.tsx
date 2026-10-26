@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { checkStatus, getOrganizationSettings, formatRupiah, formatIndoDate } from '@/lib/store';
@@ -34,14 +34,7 @@ function StatusContent() {
   const [loading, setLoading] = useState(false);
   const [orgSettings, setOrgSettings] = useState<OrganizationSettings | null>(null);
 
-  useEffect(() => {
-    getOrganizationSettings().then(setOrgSettings);
-    if (initialCode && initialPhone) {
-      handleSearch(initialCode, initialPhone);
-    }
-  }, [initialCode, initialPhone]);
-
-  const handleSearch = async (targetCode: string, targetPhone: string) => {
+  const handleSearch = useCallback(async (targetCode: string, targetPhone: string) => {
     if (!targetCode.trim() || !targetPhone.trim()) return;
 
     setLoading(true);
@@ -55,7 +48,14 @@ function StatusContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    getOrganizationSettings().then(setOrgSettings);
+    if (initialCode && initialPhone) {
+      handleSearch(initialCode, initialPhone);
+    }
+  }, [initialCode, initialPhone, handleSearch]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();

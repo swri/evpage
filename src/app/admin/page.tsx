@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getAllEvents, getAllRegistrations, formatRupiah, formatIndoDate } from '@/lib/store';
+import { getCurrentAdminSession } from '@/lib/auth';
 import { EventItem, Registration } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,16 +14,20 @@ import {
   TrendingUp,
   PlusCircle,
   Calendar,
-  ArrowRight,
   ExternalLink,
   Settings2,
   FileSpreadsheet,
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const session = getCurrentAdminSession();
+  const currentUserId = session?.user?.id;
+  const isSuperAdmin = session?.user?.email === 'admin@evpage.com';
+
+  const [allEvents, setAllEvents] = useState<EventItem[]>([]);
+  const [allRegistrations, setAllRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewScope, setViewScope] = useState<'mine' | 'all'>('mine');
 
   useEffect(() => {
     async function loadDashboard() {
@@ -31,8 +36,8 @@ export default function AdminDashboardPage() {
           getAllEvents(),
           getAllRegistrations(),
         ]);
-        setEvents(evts);
-        setRegistrations(regs);
+        setAllEvents(evts);
+        setAllRegistrations(regs);
       } catch (err) {
         console.error('Failed loading dashboard stats:', err);
       } finally {
@@ -41,6 +46,16 @@ export default function AdminDashboardPage() {
     }
     loadDashboard();
   }, []);
+
+  // Filter scoped events by organizer
+  const events = isSuperAdmin && viewScope === 'all'
+    ? allEvents
+    : allEvents.filter(
+        (e) => e.created_by === currentUserId || (!e.created_by && isSuperAdmin)
+      );
+
+  const scopedEventIds = new Set(events.map((e) => e.id));
+  const registrations = allRegistrations.filter((r) => scopedEventIds.has(r.event_id));
 
   // Compute Overall Statistics
   const totalRegistrations = registrations.length;
@@ -55,15 +70,47 @@ export default function AdminDashboardPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 pb-5 dark:border-neutral-800">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+              {session?.user?.organization_name || session?.user?.full_name || 'Portal Penyelenggara'}
+            </span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100">
             Ringkasan Dashboard
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
-            Pantau seluruh aktivitas pendaftaran, verifikasi tiket, dan pemasukan keuangan.
+            Pantau aktivitas pendaftaran, verifikasi tiket, dan pemasukan keuangan event Anda.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <div className="flex items-center rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 text-xs dark:border-neutral-700 dark:bg-neutral-800">
+              <button
+                type="button"
+                onClick={() => setViewScope('mine')}
+                className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  viewScope === 'mine'
+                    ? 'bg-white shadow-2xs text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
+                }`}
+              >
+                Event Saya
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewScope('all')}
+                className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  viewScope === 'all'
+                    ? 'bg-white shadow-2xs text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
+                }`}
+              >
+                Semua Penyelenggara
+              </button>
+            </div>
+          )}
+
           <Link href="/admin/events/new">
             <Button className="h-9 text-xs font-semibold gap-1.5 shadow-xs">
               <PlusCircle className="h-3.5 w-3.5" />
