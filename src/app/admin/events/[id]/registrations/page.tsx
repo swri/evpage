@@ -1205,6 +1205,7 @@ function EventRegistrationsContent({
         onOpenChange={setRandomTeamOpen}
         eventTitle={event?.title || 'Event'}
         registrations={registrations}
+        event={event}
       />
     </div>
   );

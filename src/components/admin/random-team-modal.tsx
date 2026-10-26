@@ -29,13 +29,16 @@ import {
   teamLevel,
 } from '@/lib/team-generator';
 import { sanitizeCsvCell } from '@/lib/export';
-import { Registration } from '@/types';
+import { EventItem, Registration } from '@/types';
+import { DrawGovernancePanel } from '@/components/admin/draw-governance-panel';
 
 interface RandomTeamModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventTitle: string;
   registrations: Registration[];
+  /** Needed to publish the draw and manage change approvals */
+  event?: EventItem | null;
 }
 
 export function RandomTeamModal({
@@ -43,6 +46,7 @@ export function RandomTeamModal({
   onOpenChange,
   eventTitle,
   registrations,
+  event,
 }: RandomTeamModalProps) {
   const { toast } = useToast();
 
@@ -464,6 +468,29 @@ export function RandomTeamModal({
                   </Button>
                 )}
               </div>
+
+              {event?.organization_id && (
+                <DrawGovernancePanel
+                  event={event}
+                  workingTeams={generatedTeams}
+                  seed={usedSeed}
+                  options={{
+                    teamCount,
+                    onlyVerified,
+                    separateClubs,
+                    balanceLevel: balanceLevel && hasLevels,
+                    maxPerTeam: maxPerTeam ? Number(maxPerTeam) : null,
+                  }}
+                  manuallyAdjusted={manuallyAdjusted}
+                  pool={allPlayers}
+                  onShowTeams={(teams, label) => {
+                    setGeneratedTeams(teams);
+                    setManuallyAdjusted(false);
+                    setSelectedPlayer(null);
+                    toast({ type: 'info', message: `Menampilkan: ${label}` });
+                  }}
+                />
+              )}
 
               {/* Player Swap Indicator banner */}
               {selectedPlayer && (

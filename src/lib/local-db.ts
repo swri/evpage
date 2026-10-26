@@ -51,10 +51,12 @@ export function newId(prefix: string): string {
 export function localTable<T>(key: string, seed: () => T[]) {
   let memory: T[] | null = null;
   return {
+    // Copies in Node too, so callers never hold live references (matches the
+    // JSON round-trip that localStorage does in the browser)
     all(): T[] {
       if (isBrowser) return getStorage<T[]>(key, seed());
       if (!memory) memory = seed();
-      return memory;
+      return structuredClone(memory);
     },
     save(rows: T[]): void {
       if (isBrowser) {
@@ -63,7 +65,7 @@ export function localTable<T>(key: string, seed: () => T[]) {
         }
         return;
       }
-      memory = rows;
+      memory = structuredClone(rows);
     },
   };
 }
