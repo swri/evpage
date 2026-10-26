@@ -200,10 +200,18 @@ function EventRegistrationsContent({
     );
   };
 
+  // Sequential on purpose: in demo mode each update is a read-modify-write of
+  // the whole localStorage list, so parallel updates overwrite each other.
+  const updateSequentially = async (ids: string[], update: (id: string) => Promise<unknown>) => {
+    for (const id of ids) {
+      await update(id);
+    }
+  };
+
   const handleBulkVerify = async () => {
     if (!confirm(`Verifikasi ${selectedIds.length} pendaftar yang dipilih?`)) return;
     try {
-      await Promise.all(selectedIds.map((id) => updateRegistrationStatus(id, 'verified')));
+      await updateSequentially(selectedIds, (id) => updateRegistrationStatus(id, 'verified'));
       toast({
         type: 'success',
         message: `${selectedIds.length} pendaftar berhasil diverifikasi!`,
@@ -219,7 +227,7 @@ function EventRegistrationsContent({
     const note = prompt('Masukkan alasan penolakan untuk pendaftar terpilih:', 'Pembayaran tidak valid.');
     if (note === null) return;
     try {
-      await Promise.all(selectedIds.map((id) => updateRegistrationStatus(id, 'rejected', note)));
+      await updateSequentially(selectedIds, (id) => updateRegistrationStatus(id, 'rejected', note));
       toast({
         type: 'info',
         message: `${selectedIds.length} pendaftar ditolak.`,
