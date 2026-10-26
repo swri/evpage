@@ -105,6 +105,8 @@ export interface EventItem {
   updated_at: string;
   organizer_name?: string;
   created_by?: string;
+  /** Owning organization (tenant) */
+  organization_id?: string;
   // Computed / aggregated fields
   /** pending + verified; what counts against the quota */
   active_registrations?: number;

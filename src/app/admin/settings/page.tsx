@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getOrganizationSettings, updateOrganizationSettings } from '@/lib/store';
-import { getCurrentAdminSession } from '@/lib/auth';
+import { canManageOrg, updateOrganization } from '@/lib/orgs';
+import { useOrg } from '@/components/admin/org-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,10 +18,9 @@ import {
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
-  const session = getCurrentAdminSession();
-  const currentUserId = session?.user?.id;
+  const { session, activeOrg, loading, refresh } = useOrg();
+  const canEdit = canManageOrg(activeOrg?.role) || !!session?.user.is_platform_admin;
 
-  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Settings State
@@ -36,25 +35,28 @@ export default function AdminSettingsPage() {
   const [instructions, setInstructions] = useState('');
 
   useEffect(() => {
-    getOrganizationSettings(currentUserId).then((settings) => {
-      setName(settings.name || session?.user?.organization_name || session?.user?.full_name || '');
-      setLogoUrl(settings.logo_url || '');
-      setAccentColor(settings.accent_color || '#0f172a');
-      setWaNumber(settings.wa_number);
-      setBankName(settings.payment_info.bank_name);
-      setAccountNumber(settings.payment_info.account_number);
-      setAccountHolder(settings.payment_info.account_holder);
-      setQrisUrl(settings.payment_info.qris_url || '');
-      setInstructions(settings.payment_info.instructions || '');
-      setLoading(false);
-    });
-  }, [currentUserId, session]);
+    if (!activeOrg) return;
+    // Copy the active organization into the editable form
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setName(activeOrg.name || '');
+    setLogoUrl(activeOrg.logo_url || '');
+    setAccentColor(activeOrg.accent_color || '#0f172a');
+    setWaNumber(activeOrg.wa_number || '');
+    setBankName(activeOrg.payment_info?.bank_name || '');
+    setAccountNumber(activeOrg.payment_info?.account_number || '');
+    setAccountHolder(activeOrg.payment_info?.account_holder || '');
+    setQrisUrl(activeOrg.payment_info?.qris_url || '');
+    setInstructions(activeOrg.payment_info?.instructions || '');
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [activeOrg]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeOrg) return;
     setIsSaving(true);
     try {
-      await updateOrganizationSettings(
+      await updateOrganization(
+        activeOrg.id,
         {
           name: name.trim(),
           logo_url: logoUrl.trim(),
@@ -68,8 +70,9 @@ export default function AdminSettingsPage() {
             instructions: instructions.trim(),
           },
         },
-        currentUserId
+        session
       );
+      await refresh();
 
       toast({
         type: 'success',
@@ -95,6 +98,14 @@ export default function AdminSettingsPage() {
     );
   }
 
+  if (!activeOrg) {
+    return (
+      <div className="p-12 text-center text-sm text-neutral-500">
+        Buat atau gabung ke organisasi terlebih dahulu di menu Organisasi &amp; Tim.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200 max-w-4xl">
       {/* Header */}
@@ -111,6 +122,8 @@ export default function AdminSettingsPage() {
         <Button
           onClick={handleSave}
           isLoading={isSaving}
+          disabled={!canEdit}
+          title={canEdit ? undefined : 'Hanya pemilik/admin organisasi yang dapat mengubah pengaturan'}
           className="h-9 text-xs font-semibold gap-1.5 shadow-xs"
         >
           <Save className="h-3.5 w-3.5" />

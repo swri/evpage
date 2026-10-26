@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sanitizeCsvRow } from '@/lib/export';
-import { canManageEvent, getCurrentAdminSession } from '@/lib/auth';
+import { useOrg } from '@/components/admin/org-context';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 function EventRegistrationsContent({
@@ -53,6 +53,7 @@ function EventRegistrationsContent({
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const { canManageEvent, loading: orgLoading } = useOrg();
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,7 +89,7 @@ function EventRegistrationsContent({
         getRegistrationsByEvent(eventId),
       ]);
       // Participant data is personal; only the event owner (or super admin) may see it
-      if (evt && !canManageEvent(evt, getCurrentAdminSession())) {
+      if (evt && !canManageEvent(evt)) {
         setAccessDenied(true);
         setEvent(null);
         setRegistrations([]);
@@ -104,8 +105,10 @@ function EventRegistrationsContent({
   };
 
   useEffect(() => {
+    // Access check needs the organization list first
+    if (orgLoading) return;
     loadData();
-  }, [eventId]);
+  }, [eventId, orgLoading]);
 
   // Filtered registrations
   const filteredRegistrations = useMemo(() => {

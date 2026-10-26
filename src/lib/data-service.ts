@@ -319,6 +319,9 @@ export const BUILT_IN_TEMPLATES: { id: string; name: string; description: string
   }
 ];
 
+// Demo organization that owns the seeded events (see lib/orgs.ts)
+export const DEMO_ORG_ID = 'org-demo';
+
 export const INITIAL_ORGANIZATION_SETTINGS: OrganizationSettings = {
   name: 'Arena Sport & Event Center',
   logo_url: '/icon.svg',
@@ -336,6 +339,7 @@ export const INITIAL_ORGANIZATION_SETTINGS: OrganizationSettings = {
 export const INITIAL_EVENTS: EventItem[] = [
   {
     id: 'evt-mini-soccer-2026',
+    organization_id: DEMO_ORG_ID,
     slug: 'mini-soccer-championship-2026',
     title: 'Mandiri Mini Soccer Cup 2026',
     description: `## Selamat Datang di Turnamen Mini Soccer Bergengsi 2026!
@@ -366,6 +370,7 @@ Turnamen terbuka untuk instansi swasta, BUMN, dan komunitas umum se-Jabodetabek.
   },
   {
     id: 'evt-ai-summit-2026',
+    organization_id: DEMO_ORG_ID,
     slug: 'ai-next-gen-web-summit',
     title: 'AI & Next-Gen Web Development Summit',
     description: `## Belajar Langsung dari Para Pakar AI & Modern Frontend
@@ -395,6 +400,7 @@ Konferensi sehari penuh membahas integrasi LLM, WebAssembly, Server Components, 
   },
   {
     id: 'evt-poster-kreatif-2026',
+    organization_id: DEMO_ORG_ID,
     slug: 'lomba-poster-kreatif-2026',
     title: 'Lomba Desain Poster Kreatif Nasional 2026',
     description: `## Kompetisi Desain Visual Tingkat Nasional

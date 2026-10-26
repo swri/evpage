@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getAllEvents, duplicateEvent, deleteEvent, formatRupiah } from '@/lib/store';
-import { getCurrentAdminSession, isSuperAdmin as checkSuperAdmin } from '@/lib/auth';
+import { useOrg } from '@/components/admin/org-context';
 import { EventItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,9 +20,8 @@ import {
 
 export default function AdminEventsPage() {
   const { toast } = useToast();
-  const session = getCurrentAdminSession();
+  const { session, activeOrg, isPlatformAdmin: isSuperAdmin } = useOrg();
   const currentUserId = session?.user?.id;
-  const isSuperAdmin = checkSuperAdmin(session);
 
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,8 +45,9 @@ export default function AdminEventsPage() {
 
   const events = isSuperAdmin && viewScope === 'all'
     ? allEvents
-    : allEvents.filter(
-        (e) => e.created_by === currentUserId || (!e.created_by && isSuperAdmin)
+    : allEvents.filter((e) =>
+        // Scoped to the active organization; legacy events stay with their creator
+        e.organization_id ? e.organization_id === activeOrg?.id : e.created_by === currentUserId
       );
 
   const handleDuplicate = async (id: string, title: string) => {
@@ -114,7 +114,7 @@ export default function AdminEventsPage() {
                     : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
                 }`}
               >
-                Event Saya
+                {activeOrg?.name || 'Organisasi Ini'}
               </button>
               <button
                 type="button"

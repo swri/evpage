@@ -4,8 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { getCurrentAdminSession, logoutAdmin } from '@/lib/auth';
-import { getOrganizationSettings } from '@/lib/store';
-import { OrganizationSettings } from '@/types';
+import { OrgProvider, useOrg } from '@/components/admin/org-context';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
 import {
@@ -18,20 +17,13 @@ import {
   Menu,
   X,
   ChevronRight,
+  Building2,
 } from 'lucide-react';
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [orgSettings, setOrgSettings] = useState<OrganizationSettings | null>(null);
-  const [adminUser, setAdminUser] = useState<{
-    id: string;
-    email: string;
-    full_name: string;
-    organization_name?: string;
-  } | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
   const isAuthPage = pathname === '/admin/login' || pathname === '/admin/register';
@@ -47,10 +39,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setAdminUser(session.user);
     setAuthChecked(true);
-
-    getOrganizationSettings().then(setOrgSettings);
   }, [pathname, isAuthPage, router]);
 
   // If on auth pages (login / register), render children without sidebar
@@ -66,6 +55,20 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+
+  return (
+    <OrgProvider>
+      <AdminShell>{children}</AdminShell>
+    </OrgProvider>
+  );
+}
+
+function AdminShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { session, organizations, activeOrg, setActiveOrg, invitations } = useOrg();
+  const adminUser = session?.user ?? null;
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logoutAdmin();
@@ -92,7 +95,13 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       active: pathname === '/admin/events/new',
     },
     {
-      label: 'Pengaturan Organisasi',
+      label: invitations.length > 0 ? `Organisasi & Tim (${invitations.length} undangan)` : 'Organisasi & Tim',
+      href: '/admin/organization',
+      icon: Building2,
+      active: pathname === '/admin/organization',
+    },
+    {
+      label: 'Branding & Rekening',
       href: '/admin/settings',
       icon: Settings,
       active: pathname === '/admin/settings',
@@ -106,9 +115,30 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         {/* Brand / Org Header with Monochrome EVP Logo */}
         <div className="p-4 border-b border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between">
           <Link href="/admin" className="hover:opacity-90 transition-opacity">
-            <AppLogo size="sm" subtitle={orgSettings?.name || 'Admin Portal'} />
+            <AppLogo size="sm" subtitle={activeOrg?.name || 'Admin Portal'} />
           </Link>
         </div>
+
+        {/* Organization switcher: everything below is scoped to this tenant */}
+        {organizations.length > 1 && (
+          <div className="px-4 pt-3">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-1" htmlFor="org-switcher">
+              Organisasi Aktif
+            </label>
+            <select
+              id="org-switcher"
+              value={activeOrg?.id || ''}
+              onChange={(e) => setActiveOrg(e.target.value)}
+              className="w-full h-8 rounded-lg border border-neutral-200 bg-white px-2 text-xs font-medium text-neutral-900 dark:border-neutral-800 dark:bg-neutral-800 dark:text-neutral-100"
+            >
+              {organizations.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Navigation Links */}
         <div className="flex-1 py-4 px-3 space-y-1">

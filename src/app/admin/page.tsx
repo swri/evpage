@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getAllEvents, getAllRegistrations, formatRupiah, formatIndoDate } from '@/lib/store';
-import { getCurrentAdminSession, isSuperAdmin as checkSuperAdmin } from '@/lib/auth';
+import { useOrg } from '@/components/admin/org-context';
 import { EventItem, Registration } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,9 +20,8 @@ import {
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
-  const session = getCurrentAdminSession();
+  const { session, activeOrg, isPlatformAdmin: isSuperAdmin } = useOrg();
   const currentUserId = session?.user?.id;
-  const isSuperAdmin = checkSuperAdmin(session);
 
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<Registration[]>([]);
@@ -50,8 +49,9 @@ export default function AdminDashboardPage() {
   // Filter scoped events by organizer
   const events = isSuperAdmin && viewScope === 'all'
     ? allEvents
-    : allEvents.filter(
-        (e) => e.created_by === currentUserId || (!e.created_by && isSuperAdmin)
+    : allEvents.filter((e) =>
+        // Scoped to the active organization; legacy events stay with their creator
+        e.organization_id ? e.organization_id === activeOrg?.id : e.created_by === currentUserId
       );
 
   const scopedEventIds = new Set(events.map((e) => e.id));
@@ -95,7 +95,7 @@ export default function AdminDashboardPage() {
                     : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
                 }`}
               >
-                Event Saya
+                {activeOrg?.name || 'Organisasi Ini'}
               </button>
               <button
                 type="button"

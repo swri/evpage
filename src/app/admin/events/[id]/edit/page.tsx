@@ -4,7 +4,7 @@ import React, { useEffect, useState, use } from 'react';
 import { EventBuilder } from '@/components/admin/event-builder';
 import { getEventById } from '@/lib/store';
 import { EventItem } from '@/types';
-import { canManageEvent, getCurrentAdminSession } from '@/lib/auth';
+import { useOrg } from '@/components/admin/org-context';
 
 function EditEventContent({
   params,
@@ -16,6 +16,7 @@ function EditEventContent({
 
   const [event, setEvent] = useState<EventItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const { canManageEvent, loading: orgLoading } = useOrg();
 
   useEffect(() => {
     getEventById(id)
@@ -25,7 +26,7 @@ function EditEventContent({
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) {
+  if (loading || orgLoading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="h-7 w-7 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white" />
@@ -41,7 +42,7 @@ function EditEventContent({
     );
   }
 
-  if (!canManageEvent(event, getCurrentAdminSession())) {
+  if (!canManageEvent(event)) {
     return (
       <div className="p-12 text-center text-neutral-500">
         Anda tidak memiliki akses untuk mengubah event ini.

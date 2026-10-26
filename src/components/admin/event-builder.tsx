@@ -12,6 +12,7 @@ import {
 import { BUILT_IN_TEMPLATES } from '@/lib/data-service';
 import { saveEvent, formatRupiah } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
+import { useOrg } from '@/components/admin/org-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -88,6 +89,7 @@ const DEFAULT_INITIAL_FIELDS: FormField[] = [
 export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps) {
   const { toast } = useToast();
   const currentSession = getCurrentAdminSession();
+  const { activeOrg } = useOrg();
 
   const [activeTab, setActiveTab] = useState<'editor' | 'settings' | 'preview'>('editor');
   const [isSaving, setIsSaving] = useState(false);
@@ -331,6 +333,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         organizer_name: organizerName.trim() || 'Panitia Resmi',
         // Editing must not transfer ownership to whoever saves (e.g. super admin)
         created_by: initialEvent?.created_by ?? currentSession?.user?.id,
+        // New events belong to the organization selected in the sidebar
+        organization_id: initialEvent?.organization_id ?? activeOrg?.id,
         form_schema: sanitizedFields,
         wa_template: waTemplate.trim(),
         success_message: successMessage.trim(),

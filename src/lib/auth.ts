@@ -1,4 +1,5 @@
 import { createClient } from './supabase/client.ts';
+import { createOrganization } from './orgs.ts';
 
 export interface AdminUser {
   id: string;
@@ -17,6 +18,8 @@ export interface AdminSession {
     email: string;
     full_name: string;
     organization_name?: string;
+    /** App owner: sees and manages every organization (platform_admins) */
+    is_platform_admin?: boolean;
   };
   token: string;
 }
@@ -131,21 +134,10 @@ export async function registerAdmin(params: {
       return { success: false, error: error?.message || 'Pendaftaran akun gagal.' };
     }
 
-    const { error: adminError } = await supabase.from('admins').insert({
-      user_id: data.user.id,
-      full_name: nameClean,
-      email: emailClean,
-    });
-    if (adminError) {
-      console.error('Supabase admins insert error:', adminError);
-      return {
-        success: false,
-        error: 'Akun dibuat, tetapi belum terdaftar sebagai penyelenggara. Hubungi pengelola platform.',
-      };
-    }
-
+    // The profile row is created by the on_auth_user_created trigger
     if (!data.session) {
-      // Email confirmation is enabled on the Supabase project
+      // Email confirmation is enabled; the organization is created after the
+      // first login from the dashboard instead.
       return {
         success: false,
         error: 'Akun berhasil dibuat. Cek email Anda untuk konfirmasi, lalu masuk.',
@@ -161,6 +153,11 @@ export async function registerAdmin(params: {
       },
       token: data.session.access_token,
     };
+    try {
+      await createOrganization(orgClean || nameClean, session);
+    } catch (err) {
+      console.error('create_organization after sign-up failed:', err);
+    }
     persistSession(session);
     return { success: true, session };
   }
@@ -196,6 +193,7 @@ export async function registerAdmin(params: {
     },
     token: randomToken('local-session'),
   };
+  await createOrganization(newAdmin.organization_name || nameClean, session);
   persistSession(session);
 
   return { success: true, session };
@@ -224,13 +222,12 @@ export async function loginAdmin(
       return { success: false, error: INVALID_LOGIN };
     }
 
-    const { data: adminData } = await supabase
-      .from('admins')
-      .select('*')
-      .eq('user_id', data.user.id)
-      .maybeSingle();
+    const [{ data: profile }, { data: platformAdmin }] = await Promise.all([
+      supabase.from('profiles').select('full_name, account_type').eq('id', data.user.id).maybeSingle(),
+      supabase.from('platform_admins').select('user_id').eq('user_id', data.user.id).maybeSingle(),
+    ]);
 
-    if (!adminData) {
+    if (!profile || (profile.account_type !== 'organizer' && !platformAdmin)) {
       await supabase.auth.signOut();
       return { success: false, error: 'Akun ini belum terdaftar sebagai penyelenggara.' };
     }
@@ -239,8 +236,8 @@ export async function loginAdmin(
       user: {
         id: data.user.id,
         email: data.user.email || emailClean,
-        full_name: adminData.full_name || 'Admin',
-        organization_name: adminData.organization_name || 'Penyelenggara Event',
+        full_name: profile.full_name || data.user.email || 'Penyelenggara',
+        is_platform_admin: !!platformAdmin,
       },
       token: data.session?.access_token || '',
     };
@@ -261,6 +258,8 @@ export async function loginAdmin(
       email: candidate.email,
       full_name: candidate.full_name,
       organization_name: candidate.organization_name || candidate.full_name,
+      // In demo mode the built-in demo account plays the app owner
+      is_platform_admin: candidate.email.toLowerCase() === DEFAULT_DEMO_ADMIN.email,
     },
     token: randomToken('local-session'),
   };
@@ -268,29 +267,25 @@ export async function loginAdmin(
   return { success: true, session };
 }
 
-// Platform-wide admin that may see and manage every organizer's events.
-// Kept in one place so a real role column can replace it later.
-export const SUPER_ADMIN_EMAIL = 'admin@evpage.com';
-
-export function isSuperAdmin(session: AdminSession | null): boolean {
-  return session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL;
-}
-
 /**
- * Organizer access check used by the admin pages. It is a UI guard only;
- * real enforcement must live in the database (RLS) in Supabase mode.
+ * App owner check. Supabase mode: row in platform_admins (granted via SQL).
+ * Demo mode: the built-in demo account.
  */
-export function canManageEvent(event: { created_by?: string }, session: AdminSession | null): boolean {
-  if (!session) return false;
-  if (isSuperAdmin(session)) return true;
-  return !!event.created_by && event.created_by === session.user.id;
+export function isSuperAdmin(session: AdminSession | null): boolean {
+  return !!session?.user?.is_platform_admin;
 }
 
 export function getCurrentAdminSession(): AdminSession | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(ADMIN_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const session = JSON.parse(raw) as AdminSession;
+    // Sessions saved before platform admins existed lack the flag
+    if (session.user.is_platform_admin === undefined && !createClient()) {
+      session.user.is_platform_admin = session.user.email?.toLowerCase() === DEFAULT_DEMO_ADMIN.email;
+    }
+    return session;
   } catch {
     return null;
   }

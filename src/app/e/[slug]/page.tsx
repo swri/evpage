@@ -68,7 +68,7 @@ function EventRegistrationContent({
     async function loadEventData() {
       try {
         const evt = await getEventBySlug(slug);
-        const settings = await getOrganizationSettings(evt?.created_by);
+        const settings = await getOrganizationSettings(evt?.organization_id);
         setEvent(evt);
         setOrgSettings(settings);
 

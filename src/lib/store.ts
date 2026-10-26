@@ -1,7 +1,9 @@
 import type { EventItem, OrganizationSettings, Registration, RegistrationStatusResult } from '../types/index.ts';
-import { INITIAL_EVENTS, INITIAL_ORGANIZATION_SETTINGS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service.ts';
+import { INITIAL_EVENTS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service.ts';
 import { createClient as getSupabaseClient, isSupabaseConfigured } from './supabase/client.ts';
 import { dbError, getStorage, isBrowser, setStorage } from './local-db.ts';
+import { getOrganization } from './orgs.ts';
+import { DEMO_ORG_ID } from './data-service.ts';
 
 export { formatRupiah, formatIndoDate, isSupabaseConfigured };
 
@@ -13,14 +15,11 @@ export function isUsingDatabase(): boolean {
 const STORAGE_KEYS = {
   EVENTS: 'evpage_events_v1',
   REGISTRATIONS: 'evpage_registrations_v1',
-  SETTINGS: 'evpage_settings_v1',
-  ADMIN_SESSION: 'evpage_admin_session_v1'
 };
 
 // In-memory cache for SSR & server actions
 let memoryEvents: EventItem[] = [...INITIAL_EVENTS];
 let memoryRegistrations: Registration[] = [...INITIAL_REGISTRATIONS];
-let memorySettings: OrganizationSettings = { ...INITIAL_ORGANIZATION_SETTINGS };
 
 const EMPTY_ORGANIZATION_SETTINGS: OrganizationSettings = {
   name: 'Penyelenggara Event',
@@ -30,85 +29,24 @@ const EMPTY_ORGANIZATION_SETTINGS: OrganizationSettings = {
 };
 
 // ==========================================
-// Organization Settings API (Multi-tenant scoped per organizer)
+// Organization branding & payment info (per organization / tenant)
+// Editing lives in lib/orgs.ts (updateOrganization).
 // ==========================================
-export async function getOrganizationSettings(organizerId?: string): Promise<OrganizationSettings> {
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
-    if (error || !data) {
-      // Non-fatal for page rendering, but never fall back to demo payment details
-      if (error) console.error('Supabase getOrganizationSettings error:', error);
-      return EMPTY_ORGANIZATION_SETTINGS;
-    }
-    return {
-      id: data.id,
-      name: data.name,
-      logo_url: data.logo_url,
-      accent_color: data.accent_color,
-      wa_number: data.wa_number,
-      payment_info: data.payment_info,
-      updated_at: data.updated_at,
-    };
+/**
+ * Branding/payment details of an event's organization. Without an id the
+ * demo organization is used in demo mode; Supabase mode returns neutral
+ * platform branding (there is no single organization).
+ */
+export async function getOrganizationSettings(organizationId?: string): Promise<OrganizationSettings> {
+  const id = organizationId || (isSupabaseConfigured() ? null : DEMO_ORG_ID);
+  try {
+    const org = await getOrganization(id);
+    return org || EMPTY_ORGANIZATION_SETTINGS;
+  } catch (err) {
+    // Non-fatal for page rendering, but never fall back to demo payment details
+    console.error('getOrganizationSettings error:', err);
+    return EMPTY_ORGANIZATION_SETTINGS;
   }
-
-  if (isBrowser) {
-    if (organizerId) {
-      const scopedKey = `${STORAGE_KEYS.SETTINGS}_${organizerId}`;
-      const scoped = getStorage<OrganizationSettings | null>(scopedKey, null);
-      if (scoped) return scoped;
-    }
-    return getStorage<OrganizationSettings>(STORAGE_KEYS.SETTINGS, memorySettings);
-  }
-  return memorySettings;
-}
-
-export async function updateOrganizationSettings(
-  settings: Partial<OrganizationSettings>,
-  organizerId?: string
-): Promise<OrganizationSettings> {
-  const current = await getOrganizationSettings(organizerId);
-  const updated: OrganizationSettings = {
-    ...current,
-    ...settings,
-    updated_at: new Date().toISOString()
-  };
-
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    // Without an id, upsert inserts a fresh row on every save
-    const { data, error } = await supabase
-      .from('organizations')
-      .upsert({
-        ...(updated.id ? { id: updated.id } : {}),
-        name: updated.name,
-        logo_url: updated.logo_url,
-        accent_color: updated.accent_color,
-        wa_number: updated.wa_number,
-        payment_info: updated.payment_info,
-        updated_at: updated.updated_at,
-      })
-      .select()
-      .single();
-    if (error) throw dbError('menyimpan pengaturan organisasi', error);
-    return { ...updated, id: data.id };
-  }
-
-  if (isBrowser) {
-    if (organizerId) {
-      setStorage(`${STORAGE_KEYS.SETTINGS}_${organizerId}`, updated);
-    } else {
-      setStorage(STORAGE_KEYS.SETTINGS, updated);
-      memorySettings = updated;
-    }
-  } else {
-    memorySettings = updated;
-  }
-  return updated;
 }
 
 // ==========================================
@@ -206,6 +144,33 @@ export async function getEventById(id: string): Promise<EventItem | null> {
   return found || null;
 }
 
+/** Only real columns; computed counters must never be written back. */
+function toEventRow(evt: EventItem) {
+  return {
+    id: evt.id,
+    organization_id: evt.organization_id,
+    created_by: evt.created_by,
+    organizer_name: evt.organizer_name,
+    contact_config: evt.contact_config,
+    slug: evt.slug,
+    title: evt.title,
+    description: evt.description,
+    cover_url: evt.cover_url,
+    location: evt.location,
+    starts_at: evt.starts_at,
+    registration_deadline: evt.registration_deadline,
+    quota: evt.quota,
+    price_type: evt.price_type,
+    price_amount: evt.price_amount,
+    prefix_code: evt.prefix_code,
+    form_schema: evt.form_schema,
+    wa_template: evt.wa_template,
+    success_message: evt.success_message,
+    status: evt.status,
+    updated_at: evt.updated_at,
+  };
+}
+
 export function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -244,6 +209,10 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
 
   const validationError = validateEventInput(eventData);
   if (validationError) throw new Error(validationError);
+  if (!eventData.id && !eventData.organization_id && isSupabaseConfigured()) {
+    // RLS only accepts events inside an organization the user belongs to
+    throw new Error('Pilih organisasi penyelenggara terlebih dahulu');
+  }
 
   if (eventData.id) {
     // Update existing event
@@ -300,6 +269,7 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       prefix_code: (eventData.prefix_code || 'EVT').toUpperCase().slice(0, 5),
       organizer_name: eventData.organizer_name || 'Panitia Resmi',
       created_by: eventData.created_by,
+      organization_id: eventData.organization_id,
       contact_config: eventData.contact_config,
       form_schema: eventData.form_schema || [],
       wa_template: eventData.wa_template || 'Halo Admin, saya telah mendaftar di *{event}*.\n\nKode Pendaftaran: *{kode}*\nNama: *{nama}*\nTotal Bayar: *Rp {total}*\nBukti: {bukti}',
@@ -315,25 +285,7 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
   // Sync to Supabase Postgres if configured
   const supabase = getSupabaseClient();
   if (supabase) {
-    const { error } = await supabase.from('events').upsert({
-        id: updatedEvent.id,
-        slug: updatedEvent.slug,
-        title: updatedEvent.title,
-        description: updatedEvent.description,
-        cover_url: updatedEvent.cover_url,
-        location: updatedEvent.location,
-        starts_at: updatedEvent.starts_at,
-        registration_deadline: updatedEvent.registration_deadline,
-        quota: updatedEvent.quota,
-        price_type: updatedEvent.price_type,
-        price_amount: updatedEvent.price_amount,
-        prefix_code: updatedEvent.prefix_code,
-        form_schema: updatedEvent.form_schema,
-        wa_template: updatedEvent.wa_template,
-        success_message: updatedEvent.success_message,
-        status: updatedEvent.status,
-        updated_at: updatedEvent.updated_at,
-      });
+    const { error } = await supabase.from('events').upsert(toEventRow(updatedEvent));
     if (error) throw dbError('menyimpan event', error);
     return updatedEvent;
   }
