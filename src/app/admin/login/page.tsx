@@ -11,6 +11,10 @@ import { ArrowLeft, KeyRound, Mail, Sparkles } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
 import { isUsingDatabase } from '@/lib/store';
+import { safeNextPath } from '@/lib/admin-guard';
+
+// Where to go after login: the page the proxy bounced us from, if it is safe
+const destination = () => safeNextPath(new URLSearchParams(window.location.search).get('next'));
 
 // Demo credentials only exist when no database is configured
 const DEMO_MODE = !isUsingDatabase();
@@ -28,7 +32,7 @@ export default function AdminLoginPage() {
     // If already logged in, redirect to dashboard
     const session = getCurrentAdminSession();
     if (session) {
-      router.push('/admin');
+      router.push(destination());
     }
   }, [router]);
 
@@ -45,7 +49,7 @@ export default function AdminLoginPage() {
           title: 'Login Berhasil',
           message: `Selamat datang kembali, ${res.session?.user.full_name || 'Admin'}!`,
         });
-        router.push('/admin');
+        router.push(destination());
       } else {
         setErrorMessage(res.error || 'Login gagal. Periksa kembali email dan password.');
       }
