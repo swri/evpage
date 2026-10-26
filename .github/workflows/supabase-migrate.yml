@@ -1,0 +1,76 @@
+name: Supabase migrations
+
+# Applies new files in supabase/migrations/ to the production database after
+# CI passed on main. Vercel deploys the code by itself through its Git
+# integration; see README "Deploy otomatis" for ordering.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: >-
+          Sekali saja, bila skema dulu dipasang lewat SQL Editor: tandai semua migrasi
+          yang sudah ada sebagai diterapkan (tidak menjalankan SQL-nya).
+        type: boolean
+        default: false
+      dry_run:
+        description: Hanya tampilkan migrasi yang akan diterapkan
+        type: boolean
+        default: false
+
+# Never run two migrations at the same time
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    # Lets you add required reviewers under Settings > Environments > production
+    environment: production
+    env:
+      # Session pooler connection string (GitHub runners have no IPv6), percent-encoded
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The commit CI just tested, not whatever main points to now
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Check configuration
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::Secret SUPABASE_DB_URL belum diatur; migrasi dilewati."
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: env.SKIP != 'true'
+        with:
+          version: latest
+
+      - name: Baseline existing migrations (one-time)
+        if: env.SKIP != 'true' && inputs.baseline
+        run: |
+          versions=$(ls supabase/migrations/*.sql | xargs -n1 basename | cut -d_ -f1)
+          echo "Menandai sebagai diterapkan: $versions"
+          supabase migration repair --status applied $versions --db-url "$SUPABASE_DB_URL" --yes
+
+      - name: Preview pending migrations
+        if: env.SKIP != 'true'
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+
+      - name: Apply migrations
+        if: env.SKIP != 'true' && !inputs.dry_run
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
+
+      # Optional strict ordering: only when Vercel auto-deploys of main are
+      # turned off (README "Urutan ketat"), deploy after the database is ready
+      - name: Trigger Vercel production deploy
+        if: env.SKIP != 'true' && !inputs.dry_run && env.VERCEL_DEPLOY_HOOK_URL != ''
+        run: curl --fail --silent --show-error -X POST "$VERCEL_DEPLOY_HOOK_URL"

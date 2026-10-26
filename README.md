@@ -102,7 +102,7 @@ Pilih salah satu cara:
 - **Cara 1 — SQL Editor (paling mudah)**
   1. Di repo ini buka `supabase/schema.sql` dan salin seluruh isinya. File ini gabungan semua migrasi dan selalu sinkron karena dijaga test.
   2. Di dashboard Supabase buka **SQL Editor → New query**, tempel, lalu klik **Run**. Bila muncul peringatan *destructive operation* (karena ada `DROP POLICY`/`DROP FUNCTION IF EXISTS`), pilih untuk tetap menjalankan.
-  3. Pastikan hasilnya *Success*. Jalankan **sekali** saja pada project baru.
+  3. Pastikan hasilnya *Success*. Jalankan **sekali** saja pada project baru. Bila nanti memakai deploy otomatis, jalankan langkah *baseline* (lihat **Deploy otomatis**).
 
 - **Cara 2 — Supabase CLI (disarankan untuk pembaruan berikutnya)**
   ```bash
@@ -111,7 +111,7 @@ Pilih salah satu cara:
   npx supabase link --project-ref <REF>  # REF = bagian ID di URL dashboard project
   npx supabase db push                   # menerapkan supabase/migrations/* yang belum diterapkan
   ```
-  Untuk pembaruan berikutnya cukup `npx supabase db push`. Jangan mencampur dengan Cara 1 pada project yang sama, karena CLI mencatat migrasi mana yang sudah diterapkan.
+  Pembaruan berikutnya bisa otomatis lewat GitHub Actions (lihat **Deploy otomatis**). Jangan mencampur dengan Cara 1 tanpa langkah *baseline*, karena CLI mencatat migrasi mana yang sudah diterapkan.
 
 > Jangan jalankan `supabase/seed.sql` di production; isinya data contoh, termasuk rekening contoh.
 
@@ -184,12 +184,40 @@ Salin domain hasil deploy (misalnya `https://evpage.vercel.app` atau domain kust
 4. Undang panitia lain lewat **Organisasi & Tim**. Mereka mendaftar atau login dengan email yang diundang, lalu menerima undangan di halaman yang sama.
 5. Cek pratinjau link: buka *View Page Source* di `https://<domain>/e/<slug>` dan pastikan ada `<meta property="og:title" ...>`. WhatsApp dan Facebook menyimpan pratinjau cukup lama; untuk memaksa refresh, pakai Facebook Sharing Debugger (<https://developers.facebook.com/tools/debug/>). Gambar cover sebaiknya URL publik `https://` berukuran sekitar 1200×630.
 
-### Memperbarui aplikasi
-- **Kode**: push ke `main` → Vercel deploy otomatis.
-- **Skema**: tambahkan file baru di `supabase/migrations/`, jalankan `pnpm db:schema`, commit, lalu terapkan ke Supabase:
-  - CLI: `npx supabase db push`.
-  - SQL Editor: jalankan **hanya file migrasi baru**. Jangan jalankan ulang seluruh `schema.sql` di database yang sudah berisi.
-- Selalu terapkan migrasi **sebelum** deploy kode yang membutuhkannya.
+### Deploy otomatis (push ke `main` = kode + database ter-update)
+
+| Bagian | Siapa yang men-deploy | Kapan |
+|---|---|---|
+| Kode | **Vercel Git integration** (otomatis setelah repo di-import) | setiap push ke `main` → production; setiap pull request → preview |
+| Database | **GitHub Actions** `.github/workflows/supabase-migrate.yml` | setelah workflow **CI** lulus di `main`: menerapkan file baru di `supabase/migrations/` |
+
+**Setup sekali saja**
+1. Di Supabase klik **Connect** (atas dashboard), pilih **Session pooler**, lalu salin connection string. Bentuknya `postgresql://postgres.<ref>:<PASSWORD>@aws-…pooler.supabase.com:5432/postgres`.
+   - Pakai *Session pooler*, bukan *Direct connection*: koneksi langsung hanya IPv6, sedangkan runner GitHub tidak mendukung IPv6.
+   - Ganti `<PASSWORD>` dengan password database. Bila password mengandung karakter seperti `@ : / ? # %`, karakter itu harus di-*percent-encode* (contoh: `@` → `%40`).
+2. Di GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**. Nama: `SUPABASE_DB_URL`, isi: string dari langkah 1.
+3. **Hanya bila skema dulu dipasang lewat SQL Editor (Cara 1):** database belum punya catatan migrasi, sehingga CLI akan mencoba menjalankan ulang semuanya (dan gagal).
+   1. Buka **Actions → Supabase migrations → Run workflow**, centang *baseline*, lalu jalankan.
+   2. Langkah ini hanya menandai semua migrasi yang ada sebagai sudah diterapkan; tidak ada SQL yang dijalankan. Lakukan **sekali**.
+   - Bila dulu memakai Cara 2 (CLI), lewati langkah ini.
+4. (Opsional) **Settings → Environments → production → Required reviewers**: setiap migrasi menunggu persetujuan Anda sebelum dijalankan.
+
+**Alur sehari-hari**
+1. Buat migrasi baru `supabase/migrations/<YYYYMMDDHHMMSS>_<nama>.sql`, lalu jalankan `pnpm db:schema` dan `pnpm test`.
+2. Commit & push ke `main` (lebih aman lewat pull request).
+3. Vercel membangun kode. Bersamaan dengan itu CI berjalan, lalu migrasi diterapkan. Pantau di tab **Actions**: langkah *Preview pending migrations* menampilkan file yang akan dijalankan.
+4. Tidak ada migrasi baru → workflow selesai tanpa perubahan.
+
+**Soal urutan.** Vercel dan migrasi berjalan paralel, sehingga selama ±1–3 menit kode baru bisa aktif sebelum kolom/fungsi barunya ada. Ada dua pilihan:
+- **Disarankan:** buat migrasi yang *kompatibel ke belakang* (tambah kolom/fungsi dulu, hapus yang lama di rilis berikutnya). Halaman publik sudah otomatis memuat di browser bila query server gagal.
+- **Urutan ketat** (database dulu, baru kode):
+  1. Di Vercel buat **Settings → Git → Deploy Hooks** untuk branch `main`, lalu simpan URL-nya sebagai secret `VERCEL_DEPLOY_HOOK_URL`.
+  2. Matikan deploy otomatis `main` dengan menambahkan `vercel.json` berisi `{ "git": { "deploymentEnabled": { "main": false } } }`.
+  3. Workflow migrasi akan memanggil hook itu setelah database siap. Pull request tetap mendapat preview.
+
+> **Preview deploy memakai database yang sama** bila env Preview diisi kunci production. Agar uji coba di pull request tidak mengubah data asli, buat project Supabase kedua untuk Preview dan isi env *Preview* di Vercel dengan kuncinya.
+
+> **Jangan menggabungkan** workflow ini dengan integrasi GitHub bawaan Supabase yang juga menerapkan migrasi ke production; pilih salah satu. Jangan pula menjalankan migrasi manual lewat SQL Editor setelah otomatisasi aktif, karena catatan migrasinya jadi tidak sinkron.
 
 ### Batas paket gratis & pemeliharaan
 - Paket gratis Supabase membatasi ukuran database dan Storage, dan project dapat dijeda bila lama tidak dipakai. Cek angka terbaru di halaman *Usage* dan *Pricing* Supabase.
