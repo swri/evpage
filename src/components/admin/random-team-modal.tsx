@@ -23,7 +23,9 @@ import {
   generateTournamentDraw,
   formatTeamsForWhatsApp,
   formatTournamentForWhatsApp,
+  generateSeed,
 } from '@/lib/team-generator';
+import { sanitizeCsvCell } from '@/lib/export';
 import { Registration } from '@/types';
 
 interface RandomTeamModalProps {
@@ -71,6 +73,11 @@ export function RandomTeamModal({
   const [copiedWA, setCopiedWA] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
 
+  // Seed makes a draw replayable: same seed + same participants = same teams
+  const [seedInput, setSeedInput] = useState('');
+  const [usedSeed, setUsedSeed] = useState('');
+  const [manuallyAdjusted, setManuallyAdjusted] = useState(false);
+
   // Manual player move target
   const [selectedPlayer, setSelectedPlayer] = useState<{
     teamId: string;
@@ -91,13 +98,17 @@ export function RandomTeamModal({
     setIsShuffling(true);
     setTimeout(() => {
       try {
-        const teams = generateBalancedTeams(allPlayers, teamCount, teamNames);
+        const seed = seedInput.trim().toUpperCase() || generateSeed();
+        const teams = generateBalancedTeams(allPlayers, teamCount, teamNames, { seed });
         setGeneratedTeams(teams);
+        setUsedSeed(seed);
+        setSeedInput('');
+        setManuallyAdjusted(false);
         setSelectedPlayer(null);
         toast({
           type: 'success',
           title: 'Tim Berhasil Diacak!',
-          message: `${allPlayers.length} pemain berhasil dibagi ke dalam ${teams.length} tim seimbang.`,
+          message: `${allPlayers.length} pemain dibagi ke ${teams.length} tim. Seed: ${seed}`,
         });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Gagal mengacak tim';
@@ -169,6 +180,7 @@ export function RandomTeamModal({
     });
 
     setGeneratedTeams(nextTeams);
+    setManuallyAdjusted(true);
     setSelectedPlayer(null);
     toast({
       type: 'info',
@@ -184,7 +196,10 @@ export function RandomTeamModal({
         toast({ type: 'info', message: 'Silakan acak tim terlebih dahulu.' });
         return;
       }
-      text = formatTeamsForWhatsApp(eventTitle, generatedTeams);
+      // A seed only proves the draw if nobody moved players afterwards
+      text = formatTeamsForWhatsApp(eventTitle, generatedTeams, {
+        seed: manuallyAdjusted ? undefined : usedSeed,
+      });
     } else {
       if (generatedMatchups.length === 0) {
         toast({ type: 'info', message: 'Silakan lakukan undian bagan terlebih dahulu.' });
@@ -210,14 +225,19 @@ export function RandomTeamModal({
       return;
     }
 
+    // Quote-escape and neutralise formulas: names come from participants
+    const cell = (value: unknown) => `"${String(sanitizeCsvCell(value ?? '-')).replace(/"/g, '""')}"`;
     const rows: string[] = ['Tim,Nama Pemain,Posisi,No Punggung,Asal Klub,Kontak'];
     generatedTeams.forEach((team) => {
       team.players.forEach((p) => {
         rows.push(
-          `"${team.name}","${p.name}","${p.position || '-'}","${p.backNumber || '-'}","${p.teamOrigin || '-'}","${p.contactPhone || '-'}"`
+          [team.name, p.name, p.position || '-', p.backNumber ?? '-', p.teamOrigin || '-', p.contactPhone || '-']
+            .map(cell)
+            .join(',')
         );
       });
     });
+    if (usedSeed) rows.push('', cell(`Seed: ${usedSeed}${manuallyAdjusted ? ' (diubah manual)' : ''}`));
 
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -344,6 +364,22 @@ export function RandomTeamModal({
                     <Shuffle className={`h-3.5 w-3.5 ${isShuffling ? 'animate-spin' : ''}`} />
                     <span>{generatedTeams.length === 0 ? 'Kocok & Bagi Tim Sekarang' : 'Kocok Ulang (Re-Shuffle)'}</span>
                   </Button>
+
+                  <input
+                    type="text"
+                    value={seedInput}
+                    onChange={(e) => setSeedInput(e.target.value)}
+                    placeholder="Seed (opsional)"
+                    aria-label="Seed pengacakan untuk mengulang hasil"
+                    className="h-9 w-32 rounded-lg border border-neutral-200 bg-white px-2 font-mono text-xs uppercase text-neutral-900 dark:border-neutral-800 dark:bg-neutral-800 dark:text-neutral-100"
+                  />
+
+                  {usedSeed && (
+                    <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Seed: <strong className="font-mono text-neutral-800 dark:text-neutral-200">{usedSeed}</strong>
+                      {manuallyAdjusted && ' (diubah manual)'}
+                    </span>
+                  )}
 
                   {generatedTeams.length > 0 && (
                     <Button
