@@ -98,14 +98,14 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
   const [slug, setSlug] = useState(initialEvent?.slug || '');
   const [organizerName, setOrganizerName] = useState(
     initialEvent?.organizer_name ||
-      currentSession?.user?.organization_name ||
-      currentSession?.user?.full_name ||
-      'Panitia Resmi'
+    currentSession?.user?.organization_name ||
+    currentSession?.user?.full_name ||
+    'Panitia Resmi'
   );
   const [description, setDescription] = useState(initialEvent?.description || '');
   const [coverUrl, setCoverUrl] = useState(
     initialEvent?.cover_url ||
-      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&auto=format&fit=crop&q=80'
+    'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&auto=format&fit=crop&q=80'
   );
   const [location, setLocation] = useState(initialEvent?.location || '');
   const [startsAt, setStartsAt] = useState(
@@ -121,11 +121,11 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
   const [status, setStatus] = useState<EventStatus>(initialEvent?.status || 'open');
   const [waTemplate, setWaTemplate] = useState(
     initialEvent?.wa_template ||
-      'Halo Admin, saya telah mendaftar di *{event}*.\n\nKode: *{kode}*\nNama: *{nama}*\nTotal Bayar: *Rp {total}*\nBukti: {bukti}'
+    'Halo Admin, saya telah mendaftar di *{event}*.\n\nKode: *{kode}*\nNama: *{nama}*\nTotal Bayar: *Rp {total}*\nBukti: {bukti}'
   );
   const [successMessage, setSuccessMessage] = useState(
     initialEvent?.success_message ||
-      'Terima kasih telah mendaftar! Mohon segera konfirmasi pembayaran melalui WhatsApp panitia.'
+    'Terima kasih telah mendaftar! Mohon segera konfirmasi pembayaran melalui WhatsApp panitia.'
   );
 
   // Unified Form Fields State
@@ -215,16 +215,16 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
       options:
         type === 'select' || type === 'radio' || type === 'checkbox'
           ? [
-              { label: 'Opsi 1', value: 'opsi_1' },
-              { label: 'Opsi 2', value: 'opsi_2' },
-            ]
+            { label: 'Opsi 1', value: 'opsi_1' },
+            { label: 'Opsi 2', value: 'opsi_2' },
+          ]
           : undefined,
       subFields:
         type === 'repeater'
           ? [
-              { id: 'sub_1', type: 'text', label: 'Nama', validation: { required: true } },
-              { id: 'sub_2', type: 'number', label: 'Nomor', validation: { required: true } },
-            ]
+            { id: 'sub_1', type: 'text', label: 'Nama', validation: { required: true } },
+            { id: 'sub_2', type: 'number', label: 'Nomor', validation: { required: true } },
+          ]
           : undefined,
     };
     const nextFields = [...fields, newField];
@@ -434,11 +434,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         <button
           type="button"
           onClick={() => setActiveTab('editor')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
-            activeTab === 'editor'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'editor'
               ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
               : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300'
-          }`}
+            }`}
         >
           <Sliders className="h-4 w-4" />
           <span>Editor Formulir ({fields.length} Field)</span>
@@ -447,11 +446,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         <button
           type="button"
           onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
-            activeTab === 'settings'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'settings'
               ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
               : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300'
-          }`}
+            }`}
         >
           <FileText className="h-4 w-4" />
           <span>Pengaturan Event & Harga</span>
@@ -460,11 +458,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         <button
           type="button"
           onClick={() => setActiveTab('preview')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
-            activeTab === 'preview'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'preview'
               ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
               : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300'
-          }`}
+            }`}
         >
           <Eye className="h-4 w-4" />
           <span>Pratinjau Live Form</span>
@@ -529,11 +526,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
                   <div
                     key={`field_${index}_${f.id || 'id'}`}
                     onClick={() => setSelectedFieldIndex(index)}
-                    className={`group flex items-center justify-between rounded-xl border p-3 transition-all cursor-pointer ${
-                      isSelected
+                    className={`group flex items-center justify-between rounded-xl border p-3 transition-all cursor-pointer ${isSelected
                         ? 'border-neutral-900 bg-white shadow-xs ring-1 ring-neutral-900/10 dark:border-neutral-100 dark:bg-neutral-800 dark:ring-neutral-100/10'
                         : 'border-neutral-200 bg-white/70 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className="text-neutral-300 group-hover:text-neutral-500 cursor-grab">
@@ -668,15 +664,15 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
                         options:
                           newType === 'select' || newType === 'radio' || newType === 'checkbox'
                             ? selectedField.options || [
-                                { label: 'Opsi 1', value: 'opsi_1' },
-                                { label: 'Opsi 2', value: 'opsi_2' },
-                              ]
+                              { label: 'Opsi 1', value: 'opsi_1' },
+                              { label: 'Opsi 2', value: 'opsi_2' },
+                            ]
                             : undefined,
                         subFields:
                           newType === 'repeater'
                             ? selectedField.subFields || [
-                                { id: 'sf_1', type: 'text', label: 'Nama', validation: { required: true } },
-                              ]
+                              { id: 'sf_1', type: 'text', label: 'Nama', validation: { required: true } },
+                            ]
                             : undefined,
                       });
                     }}
@@ -804,67 +800,67 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
                 {(selectedField.type === 'select' ||
                   selectedField.type === 'radio' ||
                   selectedField.type === 'checkbox') && (
-                  <div className="border-t border-neutral-100 pt-3 dark:border-neutral-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase text-neutral-400">
-                        Daftar Opsi Pilihan
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          const currentOpts = selectedField.options || [];
-                          const idx = currentOpts.length + 1;
-                          updateSelectedField({
-                            options: [
-                              ...currentOpts,
-                              { label: `Opsi ${idx}`, value: `opsi_${idx}` },
-                            ],
-                          });
-                        }}
-                        className="h-7 text-xs"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Tambah Opsi
-                      </Button>
-                    </div>
+                    <div className="border-t border-neutral-100 pt-3 dark:border-neutral-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase text-neutral-400">
+                          Daftar Opsi Pilihan
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            const currentOpts = selectedField.options || [];
+                            const idx = currentOpts.length + 1;
+                            updateSelectedField({
+                              options: [
+                                ...currentOpts,
+                                { label: `Opsi ${idx}`, value: `opsi_${idx}` },
+                              ],
+                            });
+                          }}
+                          className="h-7 text-xs"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Tambah Opsi
+                        </Button>
+                      </div>
 
-                    <div className="space-y-2">
-                      {selectedField.options?.map((opt, optIdx) => (
-                        <div key={optIdx} className="flex items-center gap-2">
-                          <Input
-                            value={opt.label}
-                            onChange={(e) => {
-                              const updated = [...(selectedField.options || [])];
-                              updated[optIdx] = {
-                                ...updated[optIdx],
-                                label: e.target.value,
-                                value: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
-                              };
-                              updateSelectedField({ options: updated });
-                            }}
-                            placeholder={`Label Opsi #${optIdx + 1}`}
-                            className="text-xs h-8 flex-1"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = (selectedField.options || []).filter(
-                                (_, idx) => idx !== optIdx
-                              );
-                              updateSelectedField({ options: updated });
-                            }}
-                            disabled={(selectedField.options || []).length <= 1}
-                            className="p-1.5 text-neutral-400 hover:text-red-500 disabled:opacity-20"
-                            title="Hapus Opsi"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                      <div className="space-y-2">
+                        {selectedField.options?.map((opt, optIdx) => (
+                          <div key={optIdx} className="flex items-center gap-2">
+                            <Input
+                              value={opt.label}
+                              onChange={(e) => {
+                                const updated = [...(selectedField.options || [])];
+                                updated[optIdx] = {
+                                  ...updated[optIdx],
+                                  label: e.target.value,
+                                  value: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                                };
+                                updateSelectedField({ options: updated });
+                              }}
+                              placeholder={`Label Opsi #${optIdx + 1}`}
+                              className="text-xs h-8 flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = (selectedField.options || []).filter(
+                                  (_, idx) => idx !== optIdx
+                                );
+                                updateSelectedField({ options: updated });
+                              }}
+                              disabled={(selectedField.options || []).length <= 1}
+                              className="p-1.5 text-neutral-400 hover:text-red-500 disabled:opacity-20"
+                              title="Hapus Opsi"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Subfields Manager for Repeater */}
                 {selectedField.type === 'repeater' && (

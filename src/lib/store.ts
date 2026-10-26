@@ -1,7 +1,12 @@
 import type { EventItem, OrganizationSettings, Registration, RegistrationStatusResult } from '../types/index.ts';
 import { INITIAL_EVENTS, INITIAL_ORGANIZATION_SETTINGS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service.ts';
+import { createClient as getSupabaseClient, isSupabaseConfigured } from './supabase/client.ts';
 
-export { formatRupiah, formatIndoDate };
+export { formatRupiah, formatIndoDate, isSupabaseConfigured };
+
+export function isUsingDatabase(): boolean {
+  return isSupabaseConfigured();
+}
 
 // Key names for browser localStorage cache when running demo/client
 const STORAGE_KEYS = {
@@ -46,6 +51,30 @@ function setStorage<T>(key: string, value: T): void {
 // Organization Settings API (Multi-tenant scoped per organizer)
 // ==========================================
 export async function getOrganizationSettings(organizerId?: string): Promise<OrganizationSettings> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      if (!error && data) {
+        return {
+          id: data.id,
+          name: data.name,
+          logo_url: data.logo_url,
+          accent_color: data.accent_color,
+          wa_number: data.wa_number,
+          payment_info: data.payment_info,
+          updated_at: data.updated_at,
+        };
+      }
+    } catch (err) {
+      console.warn('Supabase getOrganizationSettings fallback:', err);
+    }
+  }
+
   if (isBrowser) {
     if (organizerId) {
       const scopedKey = `${STORAGE_KEYS.SETTINGS}_${organizerId}`;
@@ -67,6 +96,23 @@ export async function updateOrganizationSettings(
     ...settings,
     updated_at: new Date().toISOString()
   };
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('organizations').upsert({
+        name: updated.name,
+        logo_url: updated.logo_url,
+        accent_color: updated.accent_color,
+        wa_number: updated.wa_number,
+        payment_info: updated.payment_info,
+        updated_at: updated.updated_at,
+      });
+    } catch (err) {
+      console.warn('Supabase updateOrganizationSettings fallback:', err);
+    }
+  }
+
   if (isBrowser) {
     if (organizerId) {
       setStorage(`${STORAGE_KEYS.SETTINGS}_${organizerId}`, updated);
@@ -84,11 +130,31 @@ export async function updateOrganizationSettings(
 // Events API
 // ==========================================
 export async function getAllEvents(): Promise<EventItem[]> {
-  let events: EventItem[];
-  if (isBrowser) {
-    events = getStorage<EventItem[]>(STORAGE_KEYS.EVENTS, memoryEvents);
-  } else {
-    events = memoryEvents;
+  const supabase = getSupabaseClient();
+  let events: EventItem[] = [];
+  let fetchedFromDb = false;
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        events = data as EventItem[];
+        fetchedFromDb = true;
+      }
+    } catch (err) {
+      console.warn('Supabase getAllEvents error, using fallback:', err);
+    }
+  }
+
+  if (!fetchedFromDb) {
+    if (isBrowser) {
+      events = getStorage<EventItem[]>(STORAGE_KEYS.EVENTS, memoryEvents);
+    } else {
+      events = memoryEvents;
+    }
   }
 
   // Calculate registration counts & revenue for each event
@@ -112,12 +178,42 @@ export async function getAllEvents(): Promise<EventItem[]> {
 }
 
 export async function getEventBySlug(slug: string): Promise<EventItem | null> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .ilike('slug', slug)
+        .maybeSingle();
+      if (!error && data) {
+        return data as EventItem;
+      }
+    } catch (err) {
+      console.warn('Supabase getEventBySlug error:', err);
+    }
+  }
   const events = await getAllEvents();
   const found = events.find(e => e.slug.toLowerCase() === slug.toLowerCase());
   return found || null;
 }
 
 export async function getEventById(id: string): Promise<EventItem | null> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (!error && data) {
+        return data as EventItem;
+      }
+    } catch (err) {
+      console.warn('Supabase getEventById error:', err);
+    }
+  }
   const events = await getAllEvents();
   const found = events.find(e => e.id === id);
   return found || null;
@@ -126,13 +222,14 @@ export async function getEventById(id: string): Promise<EventItem | null> {
 export async function saveEvent(eventData: Partial<EventItem>): Promise<EventItem> {
   const currentEvents = await getAllEvents();
   const now = new Date().toISOString();
+  let updatedEvent: EventItem;
 
   if (eventData.id) {
     // Update existing event
     const index = currentEvents.findIndex(e => e.id === eventData.id);
     if (index === -1) throw new Error('Event tidak ditemukan');
 
-    const updated: EventItem = {
+    updatedEvent = {
       ...currentEvents[index],
       ...eventData,
       organizer_name:
@@ -141,13 +238,13 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
           : currentEvents[index].organizer_name || 'Panitia Resmi',
       updated_at: now,
     };
-    currentEvents[index] = updated;
-    memoryEvents = currentEvents;
-    if (isBrowser) setStorage(STORAGE_KEYS.EVENTS, currentEvents);
-    return updated;
+    currentEvents[index] = updatedEvent;
   } else {
     // Create new event
-    const newId = 'evt-' + Math.random().toString(36).substring(2, 9);
+    const newId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'evt-' + Math.random().toString(36).substring(2, 9);
     const slugBase = (eventData.slug || eventData.title || 'event-baru')
       .toLowerCase()
       .trim()
@@ -161,7 +258,7 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       finalSlug = `${slugBase}-${counter++}`;
     }
 
-    const newEvent: EventItem = {
+    updatedEvent = {
       id: newId,
       slug: finalSlug,
       title: eventData.title || 'Event Baru',
@@ -185,14 +282,51 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       updated_at: now
     };
 
-    currentEvents.unshift(newEvent);
-    memoryEvents = currentEvents;
-    if (isBrowser) setStorage(STORAGE_KEYS.EVENTS, currentEvents);
-    return newEvent;
+    currentEvents.unshift(updatedEvent);
   }
+
+  // Sync to Supabase Postgres if configured
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('events').upsert({
+        id: updatedEvent.id,
+        slug: updatedEvent.slug,
+        title: updatedEvent.title,
+        description: updatedEvent.description,
+        cover_url: updatedEvent.cover_url,
+        location: updatedEvent.location,
+        starts_at: updatedEvent.starts_at,
+        registration_deadline: updatedEvent.registration_deadline,
+        quota: updatedEvent.quota,
+        price_type: updatedEvent.price_type,
+        price_amount: updatedEvent.price_amount,
+        prefix_code: updatedEvent.prefix_code,
+        form_schema: updatedEvent.form_schema,
+        wa_template: updatedEvent.wa_template,
+        success_message: updatedEvent.success_message,
+        status: updatedEvent.status,
+        updated_at: updatedEvent.updated_at,
+      });
+    } catch (err) {
+      console.warn('Supabase saveEvent error:', err);
+    }
+  }
+
+  memoryEvents = currentEvents;
+  if (isBrowser) setStorage(STORAGE_KEYS.EVENTS, currentEvents);
+  return updatedEvent;
 }
 
 export async function deleteEvent(id: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('events').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase deleteEvent error:', err);
+    }
+  }
   const currentEvents = await getAllEvents();
   const filtered = currentEvents.filter(e => e.id !== id);
   memoryEvents = filtered;
@@ -220,13 +354,52 @@ export async function duplicateEvent(id: string): Promise<EventItem> {
 // Registrations API
 // ==========================================
 export async function getAllRegistrations(): Promise<Registration[]> {
-  if (isBrowser) {
-    return getStorage<Registration[]>(STORAGE_KEYS.REGISTRATIONS, memoryRegistrations);
+  const supabase = getSupabaseClient();
+  let fetchedFromDb = false;
+  let regs: Registration[] = [];
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('registrations')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        regs = data as Registration[];
+        fetchedFromDb = true;
+      }
+    } catch (err) {
+      console.warn('Supabase getAllRegistrations fallback:', err);
+    }
   }
-  return memoryRegistrations;
+
+  if (!fetchedFromDb) {
+    if (isBrowser) {
+      regs = getStorage<Registration[]>(STORAGE_KEYS.REGISTRATIONS, memoryRegistrations);
+    } else {
+      regs = memoryRegistrations;
+    }
+  }
+  return regs;
 }
 
 export async function getRegistrationsByEvent(eventId: string): Promise<Registration[]> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('registrations')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        return data as Registration[];
+      }
+    } catch (err) {
+      console.warn('Supabase getRegistrationsByEvent fallback:', err);
+    }
+  }
+
   const all = await getAllRegistrations();
   return all.filter(r => r.event_id === eventId);
 }
@@ -289,7 +462,10 @@ export async function createRegistration(params: {
   const finalAmount = params.total_amount ?? calculatedAmount;
 
   const newReg: Registration = {
-    id: 'reg-' + Math.random().toString(36).substring(2, 9),
+    id:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'reg-' + Math.random().toString(36).substring(2, 9),
     event_id: params.event_id,
     code,
     answers: params.answers,
@@ -304,6 +480,28 @@ export async function createRegistration(params: {
     event
   };
 
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('registrations').insert({
+        id: newReg.id,
+        event_id: newReg.event_id,
+        code: newReg.code,
+        answers: newReg.answers,
+        schema_snapshot: newReg.schema_snapshot,
+        total_amount: newReg.total_amount,
+        payment_proof_path: newReg.payment_proof_path,
+        status: newReg.status,
+        contact_name: newReg.contact_name,
+        contact_phone: newReg.contact_phone,
+        contact_email: newReg.contact_email,
+        created_at: newReg.created_at,
+      });
+    } catch (err) {
+      console.warn('Supabase createRegistration fallback:', err);
+    }
+  }
+
   allRegs.unshift(newReg);
   memoryRegistrations = allRegs;
   if (isBrowser) setStorage(STORAGE_KEYS.REGISTRATIONS, allRegs);
@@ -316,6 +514,18 @@ export async function updateRegistrationStatus(
   status: 'pending' | 'verified' | 'rejected',
   admin_note?: string
 ): Promise<Registration> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const payload: Record<string, any> = { status };
+      if (admin_note !== undefined) payload.admin_note = admin_note;
+      if (status === 'verified') payload.verified_at = new Date().toISOString();
+      await supabase.from('registrations').update(payload).eq('id', id);
+    } catch (err) {
+      console.warn('Supabase updateRegistrationStatus error:', err);
+    }
+  }
+
   const allRegs = await getAllRegistrations();
   const index = allRegs.findIndex(r => r.id === id);
   if (index === -1) throw new Error('Pendaftaran tidak ditemukan');
@@ -342,6 +552,20 @@ export async function updateRegistrationData(
   contact_phone: string,
   contact_email: string
 ): Promise<Registration> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('registrations').update({
+        answers,
+        contact_name,
+        contact_phone,
+        contact_email
+      }).eq('id', id);
+    } catch (err) {
+      console.warn('Supabase updateRegistrationData error:', err);
+    }
+  }
+
   const allRegs = await getAllRegistrations();
   const index = allRegs.findIndex(r => r.id === id);
   if (index === -1) throw new Error('Pendaftaran tidak ditemukan');
@@ -361,6 +585,15 @@ export async function updateRegistrationData(
 }
 
 export async function deleteRegistration(id: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('registrations').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase deleteRegistration error:', err);
+    }
+  }
+
   const allRegs = await getAllRegistrations();
   const filtered = allRegs.filter(r => r.id !== id);
   memoryRegistrations = filtered;

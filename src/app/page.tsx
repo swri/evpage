@@ -124,7 +124,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
-              <span>Cek Status</span>
+              <span>Cek Tiket</span>
             </Link>
 
             <Link

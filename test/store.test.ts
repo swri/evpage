@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatRupiah, formatIndoDate, buildWhatsAppLink } from '../src/lib/store.ts';
+import {
+  formatRupiah,
+  formatIndoDate,
+  buildWhatsAppLink,
+  isUsingDatabase,
+  getAllEvents,
+  getOrganizationSettings,
+} from '../src/lib/store.ts';
 
 test('formatRupiah formats number to IDR currency correctly', () => {
   const result = formatRupiah(750000);
@@ -24,4 +31,23 @@ test('buildWhatsAppLink generates valid wa.me URL with encoded parameters', () =
   assert.ok(link.startsWith('https://wa.me/6281234567890'), `Expected cleaned phone number with 62 prefix, got ${link}`);
   assert.ok(link.includes('Budi%20Santoso'), 'Expected encoded name parameter in URL');
   assert.ok(link.includes('MSC-2026-0001'), 'Expected encoded code parameter in URL');
+});
+
+test('isUsingDatabase returns boolean database status', () => {
+  const usingDb = isUsingDatabase();
+  assert.equal(typeof usingDb, 'boolean');
+});
+
+test('getAllEvents returns events list with calculated fields', async () => {
+  const events = await getAllEvents();
+  assert.ok(Array.isArray(events));
+  assert.ok(events.length > 0);
+  assert.equal(typeof events[0].total_registrations, 'number');
+});
+
+test('getOrganizationSettings returns organization settings object', async () => {
+  const settings = await getOrganizationSettings();
+  assert.ok(settings);
+  assert.ok(settings.name);
+  assert.ok(settings.wa_number);
 });

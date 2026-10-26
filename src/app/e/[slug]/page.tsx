@@ -322,12 +322,12 @@ function EventRegistrationContent({
   const waAdminPhone = orgSettings?.wa_number || '6281234567890';
   const waLink = createdRegistration
     ? buildWhatsAppLink(waAdminPhone, event.wa_template, {
-        event: event.title,
-        kode: createdRegistration.code,
-        nama: createdRegistration.contact_name,
-        total: formatRupiah(createdRegistration.total_amount),
-        bukti: paymentProofName ? `Bukti terlampir (${paymentProofName})` : 'Bukti terunggah di sistem',
-      })
+      event: event.title,
+      kode: createdRegistration.code,
+      nama: createdRegistration.contact_name,
+      total: formatRupiah(createdRegistration.total_amount),
+      bukti: paymentProofName ? `Bukti terlampir (${paymentProofName})` : 'Bukti terunggah di sistem',
+    })
     : '#';
 
   // Copy registration code
@@ -356,7 +356,7 @@ function EventRegistrationContent({
               href="/status"
               className="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 transition-colors"
             >
-              Cek Status
+              Cek Tiket
             </Link>
             <ThemeToggle />
           </div>
@@ -484,7 +484,7 @@ function EventRegistrationContent({
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-medium text-neutral-700 shadow-2xs hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
                 >
                   <Search className="h-3.5 w-3.5" />
-                  <span>Pantau Status di Halaman Cek Status</span>
+                  <span>Pantau Status di Halaman Cek Tiket</span>
                 </Link>
 
                 <Button
@@ -523,10 +523,10 @@ function EventRegistrationContent({
                   {isClosed
                     ? 'Pendaftaran Ditutup'
                     : isDeadlinePassed
-                    ? 'Batas Waktu Berakhir'
-                    : isQuotaFull
-                    ? 'Kuota Penuh'
-                    : 'Pendaftaran Terbuka'}
+                      ? 'Batas Waktu Berakhir'
+                      : isQuotaFull
+                        ? 'Kuota Penuh'
+                        : 'Pendaftaran Terbuka'}
                 </Badge>
                 {event.price_type === 'free' ? (
                   <Badge variant="secondary">Gratis</Badge>
@@ -586,8 +586,8 @@ function EventRegistrationContent({
                   {isQuotaFull
                     ? 'Mohon maaf, kuota peserta untuk event ini sudah terpenuhi.'
                     : isDeadlinePassed
-                    ? 'Batas waktu pendaftaran untuk event ini telah berakhir.'
-                    : 'Pendaftaran event ini sedang dinonaktifkan oleh pihak penyelenggara.'}
+                      ? 'Batas waktu pendaftaran untuk event ini telah berakhir.'
+                      : 'Pendaftaran event ini sedang dinonaktifkan oleh pihak penyelenggara.'}
                 </p>
                 <div className="mt-5">
                   <Link
