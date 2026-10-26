@@ -223,22 +223,7 @@ export function generateBalancedTeams(
   const spreadFirst = options.spreadFirst ?? isSoccerGoalkeeper;
 
   // More teams than players would leave empty teams
-  const safeCount = Math.min(teamCount, players.length);
-  const teams: GeneratedTeam[] = [];
-
-  for (let i = 0; i < safeCount; i++) {
-    const config = DEFAULT_TEAM_CONFIGS[i % DEFAULT_TEAM_CONFIGS.length];
-    const customName = customTeamNames?.[i]?.trim();
-
-    teams.push({
-      id: `team-${i + 1}`,
-      name: customName || config.name,
-      color: config.color,
-      textColor: config.textColor,
-      badgeBg: config.badgeBg,
-      players: [],
-    });
-  }
+  const teams = createTeamShells(Math.min(teamCount, players.length), customTeamNames);
 
   // Sort first so the result depends only on who participates, not on the
   // order registrations were loaded in.
@@ -298,6 +283,21 @@ function groupLargestFirst(
   // Map keeps first-seen order, which already reflects the seeded shuffle
   const sorted = [...groups.values()].sort((a, b) => b.length - a.length);
   return [...sorted.flat(), ...loose];
+}
+
+/** Empty teams with default colors; custom names override the defaults. */
+export function createTeamShells(count: number, customTeamNames?: string[]): GeneratedTeam[] {
+  return Array.from({ length: count }, (_, i) => {
+    const config = DEFAULT_TEAM_CONFIGS[i % DEFAULT_TEAM_CONFIGS.length];
+    return {
+      id: `team-${i + 1}`,
+      name: customTeamNames?.[i]?.trim() || config.name,
+      color: config.color,
+      textColor: config.textColor,
+      badgeBg: config.badgeBg,
+      players: [],
+    };
+  });
 }
 
 /** Stable on equal levels, so the earlier shuffle still decides ties. */

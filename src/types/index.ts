@@ -112,6 +112,10 @@ export interface EventItem {
   created_by?: string;
   /** Owning organization (tenant) */
   organization_id?: string;
+  /** Event type module id (lib/event-types); defaults to 'general' */
+  event_type?: string;
+  /** Per-event overrides for the module (labels, grouping). See EventTypeConfig */
+  type_config?: Record<string, unknown>;
   // Computed / aggregated fields
   /** pending + verified registrations */
   active_registrations?: number;

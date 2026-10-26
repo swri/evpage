@@ -44,6 +44,7 @@ import * as XLSX from 'xlsx';
 import { sanitizeCsvRow } from '@/lib/export';
 import { useOrg } from '@/components/admin/org-context';
 import { PaymentProofPreview, PaymentProofThumb } from '@/components/admin/payment-proof-preview';
+import { resolveEventType } from '@/lib/event-types';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
@@ -67,6 +68,7 @@ function EventRegistrationsContent({
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const { canManageEvent, loading: orgLoading, session } = useOrg();
+  const eventTypeModule = useMemo(() => resolveEventType(event), [event]);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -495,16 +497,19 @@ function EventRegistrationsContent({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setRandomTeamOpen(true)}
-            className="h-8 text-xs gap-1.5 shadow-2xs border-emerald-500/40 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-600/40 dark:text-emerald-400 dark:hover:bg-emerald-950/30 font-medium"
-            title="Bagi tim acak dan buat bagan turnamen dari peserta terdaftar"
-          >
-            <Shuffle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Acak Tim / Drawing</span>
-          </Button>
+          {/* Grouping is an event-type module feature and can be switched off per event */}
+          {eventTypeModule.grouping.enabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRandomTeamOpen(true)}
+              className="h-8 text-xs gap-1.5 shadow-2xs border-emerald-500/40 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-600/40 dark:text-emerald-400 dark:hover:bg-emerald-950/30 font-medium"
+              title={`${eventTypeModule.labels.groupingAction} dan undian bagan dari peserta terdaftar`}
+            >
+              <Shuffle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>{eventTypeModule.labels.groupingAction}</span>
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -1200,6 +1205,8 @@ function EventRegistrationsContent({
       </Dialog>
 
       {/* Random Team & Tournament Draw Modal */}
+      {/* Mounted once the event is known so its event-type defaults apply */}
+      {event && (
       <RandomTeamModal
         open={randomTeamOpen}
         onOpenChange={setRandomTeamOpen}
@@ -1207,6 +1214,7 @@ function EventRegistrationsContent({
         registrations={registrations}
         event={event}
       />
+      )}
     </div>
   );
 }

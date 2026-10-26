@@ -340,6 +340,7 @@ export const INITIAL_EVENTS: EventItem[] = [
   {
     id: 'evt-mini-soccer-2026',
     organization_id: DEMO_ORG_ID,
+    event_type: 'mini-soccer',
     slug: 'mini-soccer-championship-2026',
     title: 'Mandiri Mini Soccer Cup 2026',
     description: `## Selamat Datang di Turnamen Mini Soccer Bergengsi 2026!
@@ -371,6 +372,7 @@ Turnamen terbuka untuk instansi swasta, BUMN, dan komunitas umum se-Jabodetabek.
   {
     id: 'evt-ai-summit-2026',
     organization_id: DEMO_ORG_ID,
+    event_type: 'seminar',
     slug: 'ai-next-gen-web-summit',
     title: 'AI & Next-Gen Web Development Summit',
     description: `## Belajar Langsung dari Para Pakar AI & Modern Frontend
@@ -401,6 +403,7 @@ Konferensi sehari penuh membahas integrasi LLM, WebAssembly, Server Components, 
   {
     id: 'evt-poster-kreatif-2026',
     organization_id: DEMO_ORG_ID,
+    event_type: 'competition',
     slug: 'lomba-poster-kreatif-2026',
     title: 'Lomba Desain Poster Kreatif Nasional 2026',
     description: `## Kompetisi Desain Visual Tingkat Nasional

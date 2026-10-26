@@ -11,6 +11,7 @@ import {
   QuotaMode,
 } from '@/types';
 import { BUILT_IN_TEMPLATES } from '@/lib/data-service';
+import { listEventTypes, resolveEventType } from '@/lib/event-types';
 import { saveEvent, formatRupiah } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
 import { useOrg } from '@/components/admin/org-context';
@@ -120,6 +121,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
   const [quota, setQuota] = useState<number>(initialEvent?.quota ?? 32);
   const [quotaMode, setQuotaMode] = useState<QuotaMode>(initialEvent?.quota_mode ?? 'registration');
   const [waitlistEnabled, setWaitlistEnabled] = useState<boolean>(initialEvent?.waitlist_enabled ?? false);
+  const [eventType, setEventType] = useState<string>(initialEvent?.event_type ?? 'general');
+  const [groupingEnabled, setGroupingEnabled] = useState<boolean>(
+    () => resolveEventType(initialEvent ?? { event_type: 'general' }).grouping.enabled
+  );
   const [priceType, setPriceType] = useState<PriceType>(initialEvent?.price_type || 'fixed');
   const [priceAmount, setPriceAmount] = useState<number>(initialEvent?.price_amount ?? 750000);
   const [prefixCode, setPrefixCode] = useState(initialEvent?.prefix_code || 'MSC');
@@ -158,6 +163,16 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
           .replace(/^-+|-+$/g, '')
       );
     }
+  };
+
+  // Switching type applies its defaults and offers its form template
+  const handleEventTypeChange = (typeId: string) => {
+    const typeModule = resolveEventType({ event_type: typeId });
+    setEventType(typeModule.id);
+    setGroupingEnabled(typeModule.grouping.enabled);
+    setQuotaMode(typeModule.defaults.quota_mode);
+    if (typeModule.defaults.price_type) setPriceType(typeModule.defaults.price_type);
+    if (typeModule.templateId) applyTemplate(typeModule.templateId);
   };
 
   // Load a built-in template
@@ -331,6 +346,15 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         quota,
         quota_mode: quotaMode,
         waitlist_enabled: waitlistEnabled,
+        event_type: eventType,
+        // Keep other per-event overrides; only the grouping switch is edited here
+        type_config: {
+          ...(initialEvent?.type_config ?? {}),
+          grouping: {
+            ...((initialEvent?.type_config?.grouping as Record<string, unknown>) ?? {}),
+            enabled: groupingEnabled,
+          },
+        },
         price_type: priceType,
         price_amount: priceAmount,
         prefix_code: prefixCode.trim().toUpperCase(),
@@ -1037,6 +1061,35 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
                 className="text-xs h-9"
                 required
               />
+            </div>
+
+            {/* Event type module: terms, grouping rules, defaults */}
+            <div>
+              <label htmlFor="event-type" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
+                Jenis Event
+              </label>
+              <select
+                id="event-type"
+                value={eventType}
+                onChange={(e) => handleEventTypeChange(e.target.value)}
+                className="h-9 w-full rounded-lg border border-neutral-200 bg-white px-2 text-xs dark:border-neutral-800 dark:bg-neutral-800"
+              >
+                {listEventTypes().map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-500">{resolveEventType({ event_type: eventType }).description}</p>
+              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                <input
+                  type="checkbox"
+                  checked={groupingEnabled}
+                  onChange={(e) => setGroupingEnabled(e.target.checked)}
+                  className="rounded border-neutral-300"
+                />
+                Aktifkan fitur {resolveEventType({ event_type: eventType }).labels.groupingAction.toLowerCase()}
+              </label>
             </div>
 
             {/* Slug URL */}

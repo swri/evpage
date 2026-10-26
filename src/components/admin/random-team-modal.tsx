@@ -19,7 +19,6 @@ import {
   GeneratedTeam,
   TournamentMatchup,
   extractPlayersFromRegistrations,
-  generateBalancedTeams,
   generateTournamentDraw,
   formatTeamsForWhatsApp,
   formatTournamentForWhatsApp,
@@ -31,6 +30,7 @@ import {
 import { sanitizeCsvCell } from '@/lib/export';
 import { EventItem, Registration } from '@/types';
 import { DrawGovernancePanel } from '@/components/admin/draw-governance-panel';
+import { getGroupingStrategy, resolveEventType } from '@/lib/event-types';
 
 interface RandomTeamModalProps {
   open: boolean;
@@ -50,17 +50,25 @@ export function RandomTeamModal({
 }: RandomTeamModalProps) {
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'players' | 'tournament'>('players');
-  const [teamCount, setTeamCount] = useState<number>(2);
-  const [onlyVerified, setOnlyVerified] = useState<boolean>(true);
+  // Terms, strategies and priority rule come from the event type module
+  const eventType = useMemo(() => resolveEventType(event), [event]);
+  const L = eventType.labels;
+  const strategies = eventType.grouping.strategies.map(getGroupingStrategy);
 
-  // Custom team names
-  const [teamNames] = useState<string[]>([
-    'Tim Merah (Red)',
-    'Tim Biru (Blue)',
-    'Tim Hijau (Green)',
-    'Tim Hitam (Black)',
-  ]);
+  const [activeTab, setActiveTab] = useState<'players' | 'tournament'>('players');
+  const [teamCount, setTeamCount] = useState<number>(() => eventType.grouping.defaultGroupCount);
+  const [onlyVerified, setOnlyVerified] = useState<boolean>(true);
+  const [strategyId, setStrategyId] = useState<string>(() => eventType.grouping.strategies[0]);
+  const strategy = getGroupingStrategy(strategyId);
+
+  // Colour names suit sport teams; other events get "Kelompok 1, 2, ..."
+  const teamNames = useMemo(
+    () =>
+      eventType.grouping.spreadFirst
+        ? undefined
+        : Array.from({ length: 12 }, (_, i) => `${L.group} ${i + 1}`),
+    [eventType, L.group]
+  );
 
   // Selected player pool
   const candidateRegistrations = useMemo(() => {
@@ -106,7 +114,7 @@ export function RandomTeamModal({
     if (allPlayers.length === 0) {
       toast({
         type: 'error',
-        title: 'Tidak Ada Pemain',
+        title: `Tidak Ada ${L.participants}`,
         message: 'Belum ada data pemain dari pendaftar yang memenuhi kriteria.',
       });
       return;
@@ -115,12 +123,17 @@ export function RandomTeamModal({
     setIsShuffling(true);
     setTimeout(() => {
       try {
-        const seed = seedInput.trim().toUpperCase() || generateSeed();
-        const teams = generateBalancedTeams(allPlayers, teamCount, teamNames, {
-          seed,
-          separateBy: separateClubs ? bySameOrigin : undefined,
-          balanceLevel: balanceLevel && hasLevels,
-          maxPerTeam: maxPerTeam ? Number(maxPerTeam) : undefined,
+        const seed = strategy.usesSeed ? seedInput.trim().toUpperCase() || generateSeed() : '';
+        const teams = strategy.build(allPlayers, {
+          teamCount,
+          teamNames,
+          seed: seed || undefined,
+          spreadFirst: eventType.grouping.spreadFirst,
+          constraints: {
+            separateBy: separateClubs ? bySameOrigin : undefined,
+            balanceLevel: balanceLevel && hasLevels,
+            maxPerTeam: maxPerTeam ? Number(maxPerTeam) : undefined,
+          },
         });
         setGeneratedTeams(teams);
         setUsedSeed(seed);
@@ -129,8 +142,8 @@ export function RandomTeamModal({
         setSelectedPlayer(null);
         toast({
           type: 'success',
-          title: 'Tim Berhasil Diacak!',
-          message: `${allPlayers.length} pemain dibagi ke ${teams.length} tim. Seed: ${seed}`,
+          title: `${L.groups} Terbentuk`,
+          message: `${allPlayers.length} ${L.participants.toLowerCase()} dibagi ke ${teams.length} ${L.groups.toLowerCase()} (${strategy.label})${seed ? `. Seed: ${seed}` : ''}`,
         });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Gagal mengacak tim';
@@ -220,7 +233,8 @@ export function RandomTeamModal({
       }
       // A seed only proves the draw if nobody moved players afterwards
       text = formatTeamsForWhatsApp(eventTitle, generatedTeams, {
-        seed: manuallyAdjusted ? undefined : usedSeed,
+        seed: manuallyAdjusted || !usedSeed ? undefined : usedSeed,
+        labels: eventType.grouping.announcement,
       });
     } else {
       if (generatedMatchups.length === 0) {
@@ -291,13 +305,13 @@ export function RandomTeamModal({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                <span>Tool Acak Tim & Undian Bagan</span>
+                <span>{L.groupingAction} & Undian Bagan</span>
                 <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-normal">
-                  Mini Soccer & Olahraga
+                  {eventType.label}
                 </Badge>
               </h2>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {eventTitle} &bull; Total Pool: <strong>{allPlayers.length} Pemain</strong>
+                {eventTitle} &bull; Total Pool: <strong>{allPlayers.length} {L.participants}</strong>
               </p>
             </div>
           </div>
@@ -324,7 +338,7 @@ export function RandomTeamModal({
               }`}
             >
               <Users className="h-3.5 w-3.5" />
-              <span>Bagi Tim Pemain (Seimbang)</span>
+              <span>{L.groupingAction}</span>
             </button>
             <button
               type="button"
@@ -350,11 +364,26 @@ export function RandomTeamModal({
                   onChange={(e) => setTeamCount(Number(e.target.value))}
                   className="h-8 rounded-lg border border-neutral-200 bg-white px-2 font-semibold text-neutral-900 dark:border-neutral-800 dark:bg-neutral-800 dark:text-neutral-100"
                 >
-                  <option value={2}>2 Tim</option>
-                  <option value={3}>3 Tim</option>
-                  <option value={4}>4 Tim</option>
-                  <option value={5}>5 Tim</option>
-                  <option value={6}>6 Tim</option>
+                  {Array.from({ length: 11 }, (_, i) => i + 2).map((n) => (
+                    <option key={n} value={n}>
+                      {n} {L.groups}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400" title={strategy.description}>
+                <span>Metode:</span>
+                <select
+                  value={strategy.id}
+                  onChange={(e) => setStrategyId(e.target.value)}
+                  className="h-8 rounded-lg border border-neutral-200 bg-white px-2 font-semibold text-neutral-900 dark:border-neutral-800 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  {strategies.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -421,7 +450,7 @@ export function RandomTeamModal({
                     className="h-9 text-xs font-semibold gap-1.5 bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 shadow-xs"
                   >
                     <Shuffle className={`h-3.5 w-3.5 ${isShuffling ? 'animate-spin' : ''}`} />
-                    <span>{generatedTeams.length === 0 ? 'Kocok & Bagi Tim Sekarang' : 'Kocok Ulang (Re-Shuffle)'}</span>
+                    <span>{generatedTeams.length === 0 ? `${L.groupingAction} Sekarang` : `Ulangi ${L.groupingAction}`}</span>
                   </Button>
 
                   <input
@@ -475,6 +504,8 @@ export function RandomTeamModal({
                   workingTeams={generatedTeams}
                   seed={usedSeed}
                   options={{
+                    strategy: strategy.id,
+                    eventType: eventType.id,
                     teamCount,
                     onlyVerified,
                     separateClubs,
@@ -519,14 +550,17 @@ export function RandomTeamModal({
                     Belum Ada Tim yang Dibagi
                   </h3>
                   <p className="text-xs text-neutral-500 max-w-md mx-auto mt-1">
-                    Klik tombol <strong>&ldquo;Kocok & Bagi Tim Sekarang&rdquo;</strong> di atas untuk membagikan {allPlayers.length} pemain ke {teamCount} tim secara seimbang (Kiper terbagi rata).
+                    Klik tombol <strong>&ldquo;{L.groupingAction} Sekarang&rdquo;</strong> di atas untuk membagikan {allPlayers.length}{' '}
+                    {L.participants.toLowerCase()} ke {teamCount} {L.groups.toLowerCase()} ({strategy.description}
+                    {eventType.grouping.spreadFirstLabel && strategy.id !== 'random' && strategy.id !== 'manual' ? ` ${eventType.grouping.spreadFirstLabel}.` : ''}).
                   </p>
                 </div>
               ) : (
                 <div className={`grid gap-4 mt-4 grid-cols-1 md:grid-cols-2 ${generatedTeams.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
                   {generatedTeams.map((team) => {
                     const isSourceTeam = selectedPlayer?.teamId === team.id;
-                    const gks = team.players.filter((p) => p.position === 'GK');
+                    const spread = eventType.grouping.spreadFirst;
+                    const gks = spread ? team.players.filter(spread) : [];
 
                     return (
                       <div
@@ -543,7 +577,8 @@ export function RandomTeamModal({
                               {team.name}
                             </h4>
                             <span className="text-[11px] text-neutral-400">
-                              {team.players.length} Pemain &bull; {gks.length} Kiper (GK)
+                              {team.players.length} {L.participants}
+                              {eventType.grouping.spreadFirst && <> &bull; {gks.length} Kiper (GK)</>}
                               {balanceLevel && hasLevels && <> &bull; Level {teamLevel(team)}</>}
                             </span>
                           </div>
