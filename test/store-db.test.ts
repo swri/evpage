@@ -59,7 +59,7 @@ test('getEventBySlug matches exactly (no ilike wildcards)', async () => {
   assert.deepEqual(eqCall?.args, ['eq', 'slug', 'mini%']);
 });
 
-test('createRegistration uses the atomic RPC with a server-side amount', async () => {
+test('createRegistration uses the atomic RPC and never sends an amount', async () => {
   const event = {
     id: 'evt-1',
     status: 'open',
@@ -82,7 +82,9 @@ test('createRegistration uses the atomic RPC with a server-side amount', async (
 
   const rpcCall = calls.find((c) => c.rpc === 'create_registration_atomic');
   assert.ok(rpcCall, 'expected create_registration_atomic to be called');
-  assert.equal((rpcCall.args as Record<string, unknown>).p_total_amount, 75000);
+  // Price and schema snapshot are computed inside the database function
+  assert.equal('p_total_amount' in (rpcCall.args as object), false);
+  assert.equal('p_schema_snapshot' in (rpcCall.args as object), false);
   assert.equal(reg.code, 'EVT-2026-0001');
 });
 

@@ -106,6 +106,8 @@ export interface EventItem {
   organizer_name?: string;
   created_by?: string;
   // Computed / aggregated fields
+  /** pending + verified; what counts against the quota */
+  active_registrations?: number;
   total_registrations?: number;
   verified_registrations?: number;
   pending_registrations?: number;

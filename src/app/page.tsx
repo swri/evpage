@@ -308,7 +308,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 gap-3 sm:gap-6">
               {filteredEvents.map((event) => {
                 const isFree = event.price_type === 'free' || event.price_amount === 0;
-                const remainingQuota = Math.max(0, event.quota - (event.total_registrations || 0));
+                const remainingQuota = Math.max(0, event.quota - (event.active_registrations || 0));
 
                 return (
                   <div

@@ -169,7 +169,7 @@ export async function getAllEvents(): Promise<EventItem[]> {
 
   // Calculate registration counts & revenue for each event
   const regs = await getAllRegistrations();
-  return events.map(evt => {
+  const withCounts = events.map(evt => {
     const eventRegs = regs.filter(r => r.event_id === evt.id);
     const verified = eventRegs.filter(r => r.status === 'verified');
     const pending = eventRegs.filter(r => r.status === 'pending');
@@ -178,6 +178,7 @@ export async function getAllEvents(): Promise<EventItem[]> {
 
     return {
       ...evt,
+      active_registrations: verified.length + pending.length,
       total_registrations: eventRegs.length,
       verified_registrations: verified.length,
       pending_registrations: pending.length,
@@ -185,6 +186,24 @@ export async function getAllEvents(): Promise<EventItem[]> {
       total_revenue: revenue
     };
   });
+  return supabase ? attachPublicSlotCounts(withCounts) : withCounts;
+}
+
+/**
+ * Anonymous visitors see no registrations under RLS, so slot usage for open
+ * events comes from the get_event_public_stats RPC (counts only).
+ */
+async function attachPublicSlotCounts(events: EventItem[]): Promise<EventItem[]> {
+  const supabase = getSupabaseClient();
+  const openIds = events.filter(e => e.status === 'open').map(e => e.id);
+  if (!supabase || openIds.length === 0) return events;
+
+  const { data, error } = await supabase.rpc('get_event_public_stats', { p_event_ids: openIds });
+  if (error) throw dbError('memuat kuota event', error);
+  const counts = new Map<string, number>(
+    ((data || []) as { event_id: string; active_registrations: number }[]).map(r => [r.event_id, r.active_registrations])
+  );
+  return events.map(e => (counts.has(e.id) ? { ...e, active_registrations: counts.get(e.id) } : e));
 }
 
 export async function getEventBySlug(slug: string): Promise<EventItem | null> {
@@ -198,7 +217,9 @@ export async function getEventBySlug(slug: string): Promise<EventItem | null> {
       .eq('slug', slug.toLowerCase())
       .maybeSingle();
     if (error) throw dbError('memuat event', error);
-    return (data as EventItem) || null;
+    if (!data) return null;
+    const [withCounts] = await attachPublicSlotCounts([data as EventItem]);
+    return withCounts;
   }
   const events = await getAllEvents();
   const found = events.find(e => e.slug.toLowerCase() === slug.toLowerCase());
@@ -473,11 +494,10 @@ export async function createRegistration(params: {
   if (supabase) {
     // Anonymous inserts are blocked by RLS; the atomic function locks the
     // event row, enforces quota/deadline and generates the code server-side.
+    // Price and form snapshot are derived inside the function from the event
     const { data, error } = await supabase.rpc('create_registration_atomic', {
       p_event_id: params.event_id,
       p_answers: params.answers,
-      p_schema_snapshot: event.form_schema,
-      p_total_amount: finalAmount,
       p_payment_proof_path: params.payment_proof_path || '',
       p_contact_name: params.contact_name,
       p_contact_phone: params.contact_phone,
