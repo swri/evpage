@@ -1,6 +1,7 @@
 import type { EventItem, OrganizationSettings, Registration, RegistrationStatusResult } from '../types/index.ts';
 import { INITIAL_EVENTS, INITIAL_ORGANIZATION_SETTINGS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service.ts';
 import { createClient as getSupabaseClient, isSupabaseConfigured } from './supabase/client.ts';
+import { dbError, getStorage, isBrowser, setStorage } from './local-db.ts';
 
 export { formatRupiah, formatIndoDate, isSupabaseConfigured };
 
@@ -20,43 +21,6 @@ const STORAGE_KEYS = {
 let memoryEvents: EventItem[] = [...INITIAL_EVENTS];
 let memoryRegistrations: Registration[] = [...INITIAL_REGISTRATIONS];
 let memorySettings: OrganizationSettings = { ...INITIAL_ORGANIZATION_SETTINGS };
-
-// Helper to determine if we are in browser
-const isBrowser = typeof window !== 'undefined';
-
-function getStorage<T>(key: string, defaultValue: T): T {
-  if (!isBrowser) return defaultValue;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) {
-      localStorage.setItem(key, JSON.stringify(defaultValue));
-      return defaultValue;
-    }
-    return JSON.parse(raw);
-  } catch {
-    return defaultValue;
-  }
-}
-
-// Returns false when the browser refuses the write (usually the ~5 MB quota,
-// e.g. a large base64 payment proof), so callers can report it.
-function setStorage<T>(key: string, value: T): boolean {
-  if (!isBrowser) return true;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch (err) {
-    console.warn('Storage set error:', err);
-    return false;
-  }
-}
-
-// When Supabase is configured the database is the only source of truth.
-// Demo data must never leak into that mode (fake bank accounts, fake events).
-function dbError(context: string, error: { message?: string } | null): Error {
-  console.error(`Supabase ${context} error:`, error);
-  return new Error(error?.message || `Gagal ${context}`);
-}
 
 const EMPTY_ORGANIZATION_SETTINGS: OrganizationSettings = {
   name: 'Penyelenggara Event',
