@@ -13,7 +13,7 @@ const SUPABASE_STUB = `
   CREATE ROLE authenticated NOLOGIN;
 
   CREATE SCHEMA auth;
-  CREATE TABLE auth.users (id UUID PRIMARY KEY, email TEXT);
+  CREATE TABLE auth.users (id UUID PRIMARY KEY, email TEXT, raw_user_meta_data JSONB DEFAULT '{}'::jsonb);
   CREATE FUNCTION auth.uid() RETURNS UUID LANGUAGE sql STABLE AS $$
     SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
   $$;
