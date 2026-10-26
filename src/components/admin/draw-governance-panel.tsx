@@ -19,6 +19,7 @@ import {
   type PublishedTeam,
 } from '@/lib/draws';
 import { getOrganizationMembers, requiredApprovals, roleCan, type OrgMember } from '@/lib/orgs';
+import { refreshPublicPages } from '@/lib/public-refresh';
 import { TEAM_ALGORITHM_VERSION, type GeneratedTeam, type PlayerParticipant } from '@/lib/team-generator';
 import type { EventItem } from '@/types';
 
@@ -34,7 +35,7 @@ const fingerprint = (teams: { id: string; players: { id: string }[] }[]) =>
   JSON.stringify(teams.map((t) => [t.id, t.players.map((p) => p.id).sort()]));
 
 interface Props {
-  event: Pick<EventItem, 'id' | 'organization_id'>;
+  event: Pick<EventItem, 'id' | 'organization_id' | 'slug'>;
   workingTeams: GeneratedTeam[];
   seed: string;
   options: Record<string, unknown>;
@@ -94,6 +95,8 @@ export function DrawGovernancePanel({ event, workingTeams, seed, options, manual
     setBusy(true);
     try {
       toast({ type: 'success', message: await action() });
+      // /e/[slug]/teams is cached on the server
+      refreshPublicPages(event.slug);
       const current = await reload();
       if (current) onShowTeams(current.result, `Hasil resmi v${current.version}`);
     } catch (err) {

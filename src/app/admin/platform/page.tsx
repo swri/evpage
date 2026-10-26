@@ -20,6 +20,7 @@ import {
   type PlatformOverview,
 } from '@/lib/cleanup';
 import { formatIndoDate } from '@/lib/store';
+import { refreshPublicPages } from '@/lib/public-refresh';
 
 const card = 'rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900';
 
@@ -197,6 +198,7 @@ export default function PlatformPage() {
                         run(
                           async () => {
                             await deleteEventWithFiles(e.id);
+                            refreshPublicPages(e.slug);
                             return `Event "${e.title}" dihapus beserta pendaftar dan filenya`;
                           },
                           `Hapus PERMANEN event "${e.title}", ${e.registrations} pendaftar, hasil undian, dan ${e.files} file?`

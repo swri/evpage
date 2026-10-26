@@ -12,6 +12,7 @@ import {
 } from '@/types';
 import { BUILT_IN_TEMPLATES } from '@/lib/data-service';
 import { listEventTypes, resolveEventType } from '@/lib/event-types';
+import { refreshPublicPages } from '@/lib/public-refresh';
 import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib/notifications';
 import { saveEvent, formatRupiah } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
@@ -378,6 +379,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
       });
 
       setEventId(saved.id);
+      // Public page and its link preview show the change right away (old slug too, if renamed)
+      refreshPublicPages(initialEvent?.slug, saved.slug);
 
       toast({
         type: 'success',

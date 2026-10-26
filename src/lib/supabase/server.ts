@@ -1,14 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { supabaseEnv } from '@/lib/admin-guard';
 
 export async function createClient() {
+  // Same rule as the browser client: empty or placeholder values = demo mode
+  const env = supabaseEnv();
+  if (!env) return null;
   const cookieStore = await cookies();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return null;
-  }
+  const { url: supabaseUrl, key: supabaseKey } = env;
 
   return createServerClient(
     supabaseUrl,

@@ -48,6 +48,7 @@ import { PaymentProofPreview, PaymentProofThumb } from '@/components/admin/payme
 import { resolveEventType } from '@/lib/event-types';
 import { buildParticipantMessage } from '@/lib/notifications';
 import { StorageCleanupDialog } from '@/components/admin/storage-cleanup-dialog';
+import { refreshPublicPages } from '@/lib/public-refresh';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
@@ -181,6 +182,8 @@ function EventRegistrationsContent({
         message: 'Dipindahkan ke Menunggu Verifikasi. Kirim kabar via tombol WhatsApp pendaftar.',
       });
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
     } catch (err: unknown) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal memindahkan pendaftar' });
     }
@@ -191,6 +194,8 @@ function EventRegistrationsContent({
       await setCheckIn(reg.id, !reg.checked_in_at, session?.user.id);
       toast({ type: 'success', message: reg.checked_in_at ? 'Check-in dibatalkan.' : `${reg.contact_name} hadir.` });
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
     } catch (err: unknown) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal mencatat kehadiran' });
     }
@@ -205,6 +210,8 @@ function EventRegistrationsContent({
         message: 'Status pendaftaran berhasil diverifikasi!',
       });
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
       if (activeDetailReg?.id === id) {
         setActiveDetailReg((prev) => (prev ? { ...prev, status: 'verified' } : null));
       }
@@ -229,6 +236,8 @@ function EventRegistrationsContent({
       });
       setRejectModalOpen(false);
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
       if (activeDetailReg?.id === rejectTargetId) {
         setActiveDetailReg((prev) =>
           prev ? { ...prev, status: 'rejected', admin_note: rejectNote } : null
@@ -246,6 +255,8 @@ function EventRegistrationsContent({
       toast({ type: 'info', message: `Pendaftaran ${code} telah dihapus.` });
       if (activeDetailReg?.id === id) setActiveDetailReg(null);
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -284,6 +295,8 @@ function EventRegistrationsContent({
       });
       setSelectedIds([]);
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -300,6 +313,8 @@ function EventRegistrationsContent({
       });
       setSelectedIds([]);
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -420,6 +435,8 @@ function EventRegistrationsContent({
         prev ? { ...prev, status: drawerStatus, admin_note: drawerNote } : null
       );
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -451,6 +468,8 @@ function EventRegistrationsContent({
       );
       setEditMode(false);
       loadData();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
