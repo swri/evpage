@@ -7,6 +7,7 @@ import {
   getOrganizationSettings,
   createRegistration,
   calculateRegistrationAmount,
+  remainingSlots,
   formatRupiah,
   formatIndoDate,
   buildWhatsAppLink,
@@ -143,9 +144,13 @@ function EventRegistrationContent({
   const isDeadlinePassed =
     event.registration_deadline && new Date(event.registration_deadline) < new Date();
   // Same rule as createRegistration / create_registration_atomic: rejected ones free their slot
-  const currentCount = event.active_registrations || 0;
-  const isQuotaFull = event.quota > 0 && currentCount >= event.quota;
-  const remainingQuota = Math.max(0, event.quota - currentCount);
+  // null = unlimited; unit depends on quota_mode (forms or people)
+  const remainingQuota = remainingSlots(event);
+  const quotaUnit = event.quota_mode === 'participant' ? 'peserta' : 'slot';
+  const isQuotaFull = remainingQuota === 0;
+  // A full event with a waitlist keeps the form open; entries are queued
+  const joinsWaitlist = isQuotaFull && !!event.waitlist_enabled;
+  const registrationBlocked = isQuotaFull && !joinsWaitlist;
 
   const totalCost = calculateRegistrationAmount(event, answers);
 
@@ -214,7 +219,8 @@ function EventRegistrationContent({
     });
 
     // Payment proof validation if not free
-    if (totalCost > 0 && !paymentProof) {
+    // Waitlisted entries pay only after they get a slot
+    if (totalCost > 0 && !paymentProof && !joinsWaitlist) {
       newErrors['payment_proof'] = 'Harap unggah bukti pembayaran transfer / QRIS.';
     }
 
@@ -402,10 +408,21 @@ function EventRegistrationContent({
                   </Button>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <Badge variant="warning">Menunggu Verifikasi</Badge>
-                  <span className="text-xs text-neutral-500">
-                    Panitia akan memeriksa pembayaran & berkas Anda
-                  </span>
+                  {createdRegistration.status === 'waitlisted' ? (
+                    <>
+                      <Badge variant="info">Daftar Tunggu</Badge>
+                      <span className="text-xs text-neutral-500">
+                        Kuota sedang penuh. Panitia akan menghubungi Anda bila ada slot kosong; jangan transfer dulu.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="warning">Menunggu Verifikasi</Badge>
+                      <span className="text-xs text-neutral-500">
+                        Panitia akan memeriksa pembayaran & berkas Anda
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -555,7 +572,14 @@ function EventRegistrationContent({
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-neutral-500 shrink-0" />
                   <span>
-                    Sisa Kuota: <strong>{remainingQuota}</strong> slot (total {event.quota})
+                    {remainingQuota === null ? (
+                      'Kuota tidak dibatasi'
+                    ) : (
+                      <>
+                        Sisa Kuota: <strong>{remainingQuota}</strong> {quotaUnit} (total {event.quota})
+                        {joinsWaitlist && ' · daftar tunggu dibuka'}
+                      </>
+                    )}
                   </span>
                 </div>
                 {event.registration_deadline && (
@@ -575,7 +599,7 @@ function EventRegistrationContent({
             </div>
 
             {/* CLOSED STATE ALERT */}
-            {(isClosed || isDeadlinePassed || isQuotaFull) ? (
+            {(isClosed || isDeadlinePassed || registrationBlocked) ? (
               <div className="rounded-xl border border-red-200 bg-red-50/80 p-6 text-center dark:border-red-900 dark:bg-red-950/40">
                 <AlertTriangle className="mx-auto h-8 w-8 text-red-600 dark:text-red-400" />
                 <h3 className="mt-3 text-lg font-bold text-red-900 dark:text-red-200">

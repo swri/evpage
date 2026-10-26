@@ -8,10 +8,13 @@ import {
   updateRegistrationStatus,
   updateRegistrationData,
   deleteRegistration,
+  promoteFromWaitlist,
+  setCheckIn,
+  remainingSlots,
   formatRupiah,
   formatIndoDate,
 } from '@/lib/store';
-import { EventItem, Registration } from '@/types';
+import { EventItem, Registration, RegistrationStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -34,12 +37,21 @@ import {
   Save,
   AlertTriangle,
   Shuffle,
+  ArrowUpCircle,
+  UserCheck,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sanitizeCsvRow } from '@/lib/export';
 import { useOrg } from '@/components/admin/org-context';
 import { PaymentProofPreview, PaymentProofThumb } from '@/components/admin/payment-proof-preview';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
+
+const STATUS_LABELS: Record<RegistrationStatus, string> = {
+  pending: 'Menunggu',
+  verified: 'Terverifikasi',
+  rejected: 'Ditolak',
+  waitlisted: 'Daftar Tunggu',
+};
 
 function EventRegistrationsContent({
   params,
@@ -54,11 +66,11 @@ function EventRegistrationsContent({
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
-  const { canManageEvent, loading: orgLoading } = useOrg();
+  const { canManageEvent, loading: orgLoading, session } = useOrg();
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | RegistrationStatus>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Detail Sheet & Modals
@@ -77,7 +89,7 @@ function EventRegistrationsContent({
 
   // Status note inside drawer
   const [drawerNote, setDrawerNote] = useState('');
-  const [drawerStatus, setDrawerStatus] = useState<'pending' | 'verified' | 'rejected'>('pending');
+  const [drawerStatus, setDrawerStatus] = useState<RegistrationStatus>('pending');
 
   // Random team & tournament draw modal
   const [randomTeamOpen, setRandomTeamOpen] = useState(false);
@@ -138,11 +150,33 @@ function EventRegistrationsContent({
     const verified = registrations.filter((r) => r.status === 'verified').length;
     const pending = registrations.filter((r) => r.status === 'pending').length;
     const rejected = registrations.filter((r) => r.status === 'rejected').length;
+    const waitlisted = registrations.filter((r) => r.status === 'waitlisted').length;
+    const checkedIn = registrations.filter((r) => r.checked_in_at).length;
     const revenue = registrations
       .filter((r) => r.status === 'verified')
       .reduce((sum, r) => sum + (r.total_amount || 0), 0);
-    return { total, verified, pending, rejected, revenue };
+    return { total, verified, pending, rejected, waitlisted, checkedIn, revenue };
   }, [registrations]);
+
+  const handlePromote = async (id: string) => {
+    try {
+      await promoteFromWaitlist(id);
+      toast({ type: 'success', message: 'Pendaftar dipindahkan dari daftar tunggu ke Menunggu Verifikasi.' });
+      loadData();
+    } catch (err: unknown) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal memindahkan pendaftar' });
+    }
+  };
+
+  const handleCheckIn = async (reg: Registration) => {
+    try {
+      await setCheckIn(reg.id, !reg.checked_in_at, session?.user.id);
+      toast({ type: 'success', message: reg.checked_in_at ? 'Check-in dibatalkan.' : `${reg.contact_name} hadir.` });
+      loadData();
+    } catch (err: unknown) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal mencatat kehadiran' });
+    }
+  };
 
   // Quick Status Actions
   const handleVerify = async (id: string) => {
@@ -266,7 +300,9 @@ function EventRegistrationsContent({
         'Nama Kontak': r.contact_name,
         'Nomor WhatsApp': r.contact_phone,
         'Email': r.contact_email,
-        'Status': r.status === 'verified' ? 'Terverifikasi' : r.status === 'pending' ? 'Menunggu' : 'Ditolak',
+        'Status': STATUS_LABELS[r.status],
+        'Jumlah Peserta': r.participant_count ?? 1,
+        'Hadir': r.checked_in_at ? formatIndoDate(r.checked_in_at, true) : '-',
         'Total Biaya (Rp)': r.total_amount,
         'Catatan Admin': r.admin_note || '-',
         'Tanggal Mendaftar': formatIndoDate(r.created_at, true),
@@ -492,7 +528,7 @@ function EventRegistrationsContent({
       </div>
 
       {/* KPI Stats Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="rounded-lg border border-neutral-200 bg-white p-3.5 dark:border-neutral-800 dark:bg-neutral-900">
           <div className="text-[11px] font-medium text-neutral-400 uppercase">Total Pendaftar</div>
           <div className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">
@@ -521,6 +557,19 @@ function EventRegistrationsContent({
           </div>
         </div>
 
+        <div className="rounded-lg border border-neutral-200 bg-white p-3.5 dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="text-[11px] font-medium text-neutral-400 uppercase">Hadir / Sisa Kuota</div>
+          <div className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">
+            {stats.checkedIn}/{stats.verified}
+          </div>
+          <div className="text-[11px] text-neutral-500">
+            {event && remainingSlots(event) !== null
+              ? `Sisa ${remainingSlots(event)} ${event.quota_mode === 'participant' ? 'peserta' : 'slot'}`
+              : 'Kuota tanpa batas'}
+            {stats.waitlisted > 0 && ` · ${stats.waitlisted} antre`}
+          </div>
+        </div>
+
         <div className="rounded-lg border border-neutral-200 bg-white p-3.5 dark:border-neutral-800 dark:bg-neutral-900 col-span-2 sm:col-span-1">
           <div className="text-[11px] font-medium text-neutral-400 uppercase">Pemasukan Sah</div>
           <div className="text-base font-bold text-neutral-900 dark:text-neutral-100 mt-1">
@@ -546,7 +595,7 @@ function EventRegistrationsContent({
 
           {/* Status Filter Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {(['all', 'pending', 'verified', 'rejected'] as const).map((st) => (
+            {(['all', 'pending', 'verified', 'waitlisted', 'rejected'] as const).map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -562,6 +611,8 @@ function EventRegistrationsContent({
                   ? `Menunggu (${stats.pending})`
                   : st === 'verified'
                   ? `Terverifikasi (${stats.verified})`
+                  : st === 'waitlisted'
+                  ? `Daftar Tunggu (${stats.waitlisted})`
                   : `Ditolak (${stats.rejected})`}
               </button>
             ))}
@@ -742,6 +793,12 @@ function EventRegistrationsContent({
                         {reg.status === 'rejected' && (
                           <Badge variant="destructive">Ditolak</Badge>
                         )}
+                        {reg.status === 'waitlisted' && (
+                          <Badge variant="info">Daftar Tunggu</Badge>
+                        )}
+                        {reg.checked_in_at && (
+                          <Badge variant="secondary" className="mt-1">Hadir</Badge>
+                        )}
                       </td>
 
                       {/* Date */}
@@ -763,8 +820,37 @@ function EventRegistrationsContent({
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
 
-                          {/* Quick Verify */}
-                          {reg.status !== 'verified' && (
+                          {/* Waitlist promotion (quota is re-checked server-side) */}
+                          {reg.status === 'waitlisted' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePromote(reg.id)}
+                              title="Pindahkan dari daftar tunggu"
+                              aria-label={`Pindahkan ${reg.code} dari daftar tunggu`}
+                              className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            >
+                              <ArrowUpCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+
+                          {/* Attendance */}
+                          {reg.status === 'verified' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCheckIn(reg)}
+                              title={reg.checked_in_at ? 'Batalkan check-in' : 'Check-in (hadir)'}
+                              aria-label={reg.checked_in_at ? `Batalkan check-in ${reg.code}` : `Check-in ${reg.code}`}
+                              aria-pressed={!!reg.checked_in_at}
+                              className={`h-7 w-7 p-0 ${reg.checked_in_at ? 'text-neutral-900 bg-neutral-100 dark:text-white dark:bg-neutral-800' : 'text-neutral-500'}`}
+                            >
+                              <UserCheck className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+
+                          {/* Quick Verify (waitlisted entries go through promotion first) */}
+                          {reg.status !== 'verified' && reg.status !== 'waitlisted' && (
                             <Button
                               variant="ghost"
                               size="sm"

@@ -1,4 +1,4 @@
-import type { EventItem, OrganizationSettings, Registration, RegistrationStatusResult } from '../types/index.ts';
+import type { EventItem, OrganizationSettings, Registration, RegistrationStatus, RegistrationStatusResult } from '../types/index.ts';
 import { INITIAL_EVENTS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service.ts';
 import { createClient as getSupabaseClient, isSupabaseConfigured } from './supabase/client.ts';
 import { dbError, getStorage, isBrowser, setStorage } from './local-db.ts';
@@ -81,6 +81,7 @@ export async function getAllEvents(): Promise<EventItem[]> {
     return {
       ...evt,
       active_registrations: verified.length + pending.length,
+      slots_used: slotsUsed(evt, eventRegs),
       total_registrations: eventRegs.length,
       verified_registrations: verified.length,
       pending_registrations: pending.length,
@@ -102,10 +103,12 @@ async function attachPublicSlotCounts(events: EventItem[]): Promise<EventItem[]>
 
   const { data, error } = await supabase.rpc('get_event_public_stats', { p_event_ids: openIds });
   if (error) throw dbError('memuat kuota event', error);
-  const counts = new Map<string, number>(
-    ((data || []) as { event_id: string; active_registrations: number }[]).map(r => [r.event_id, r.active_registrations])
-  );
-  return events.map(e => (counts.has(e.id) ? { ...e, active_registrations: counts.get(e.id) } : e));
+  type Stats = { event_id: string; slots_used: number; active_registrations: number };
+  const stats = new Map<string, Stats>(((data || []) as Stats[]).map(r => [r.event_id, r]));
+  return events.map(e => {
+    const row = stats.get(e.id);
+    return row ? { ...e, active_registrations: row.active_registrations, slots_used: row.slots_used } : e;
+  });
 }
 
 export async function getEventBySlug(slug: string): Promise<EventItem | null> {
@@ -160,6 +163,8 @@ function toEventRow(evt: EventItem) {
     starts_at: evt.starts_at,
     registration_deadline: evt.registration_deadline,
     quota: evt.quota,
+    quota_mode: evt.quota_mode ?? 'registration',
+    waitlist_enabled: evt.waitlist_enabled ?? false,
     price_type: evt.price_type,
     price_amount: evt.price_amount,
     prefix_code: evt.prefix_code,
@@ -264,6 +269,8 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       starts_at: eventData.starts_at || new Date(Date.now() + 86400000 * 14).toISOString(),
       registration_deadline: eventData.registration_deadline || new Date(Date.now() + 86400000 * 10).toISOString(),
       quota: eventData.quota ?? 50,
+      quota_mode: eventData.quota_mode ?? 'registration',
+      waitlist_enabled: eventData.waitlist_enabled ?? false,
       price_type: eventData.price_type || 'fixed',
       price_amount: eventData.price_amount ?? 0,
       prefix_code: (eventData.prefix_code || 'EVT').toUpperCase().slice(0, 5),
@@ -365,8 +372,21 @@ export async function getRegistrationsByEvent(eventId: string): Promise<Registra
 }
 
 /**
+ * People in one registration: rows of the first repeater field (minimum 1).
+ * Mirrors public.count_participants() in SQL.
+ */
+export function countParticipants(
+  event: Pick<EventItem, 'form_schema'>,
+  answers: Record<string, unknown>
+): number {
+  const repeaterField = event.form_schema.find(f => f.type === 'repeater');
+  const rows = repeaterField ? answers?.[repeaterField.id] : undefined;
+  return Array.isArray(rows) ? Math.max(1, rows.length) : 1;
+}
+
+/**
  * Total fee for a registration, derived only from the event config and answers.
- * per_participant counts rows of the first repeater field (minimum 1).
+ * per_participant multiplies by countParticipants().
  */
 export function calculateRegistrationAmount(
   event: Pick<EventItem, 'price_type' | 'price_amount' | 'form_schema'>,
@@ -374,13 +394,36 @@ export function calculateRegistrationAmount(
 ): number {
   if (event.price_type === 'free') return 0;
   const price = Math.max(0, Number(event.price_amount) || 0);
-  if (event.price_type === 'per_participant') {
-    const repeaterField = event.form_schema.find(f => f.type === 'repeater');
-    const rows = repeaterField ? answers?.[repeaterField.id] : undefined;
-    const participantCount = Array.isArray(rows) ? rows.length : 1;
-    return price * Math.max(1, participantCount);
-  }
+  if (event.price_type === 'per_participant') return price * countParticipants(event, answers);
   return price;
+}
+
+const ACTIVE_STATUSES: RegistrationStatus[] = ['pending', 'verified'];
+
+/** Slots a registration takes under the event's quota mode. */
+export function slotsNeeded(event: Pick<EventItem, 'quota_mode'>, participantCount: number | undefined): number {
+  return event.quota_mode === 'participant' ? Math.max(1, participantCount ?? 1) : 1;
+}
+
+/** Slots used by active (pending + verified) registrations. Mirrors public.event_slots_used(). */
+export function slotsUsed(event: Pick<EventItem, 'quota_mode'>, eventRegs: Registration[]): number {
+  return eventRegs
+    .filter(r => ACTIVE_STATUSES.includes(r.status))
+    .reduce((sum, r) => sum + slotsNeeded(event, r.participant_count), 0);
+}
+
+/** null means unlimited (quota 0) */
+export function remainingSlots(event: Pick<EventItem, 'quota' | 'slots_used'>): number | null {
+  if (!event.quota || event.quota <= 0) return null;
+  return Math.max(0, event.quota - (event.slots_used || 0));
+}
+
+function assertFitsQuota(event: EventItem, eventRegs: Registration[], needed: number) {
+  if (!event.quota || event.quota <= 0) return;
+  const used = slotsUsed(event, eventRegs);
+  if (used + needed > event.quota) {
+    throw new Error(`Kuota belum tersedia (sisa ${Math.max(event.quota - used, 0)}, dibutuhkan ${needed})`);
+  }
 }
 
 export async function createRegistration(params: {
@@ -424,18 +467,26 @@ export async function createRegistration(params: {
   }
 
   const allRegs = await getAllRegistrations();
-  const currentEventRegs = allRegs.filter(
-    r => r.event_id === params.event_id && r.status !== 'rejected'
-  );
+  const eventRegs = allRegs.filter(r => r.event_id === params.event_id);
 
-  // Check quota atomically
-  if (event.quota && event.quota > 0 && currentEventRegs.length >= event.quota) {
-    throw new Error('Kuota pendaftaran telah penuh');
+  // Same rules as create_registration_atomic
+  const participantCount = countParticipants(event, params.answers);
+  const needed = slotsNeeded(event, participantCount);
+  const used = slotsUsed(event, eventRegs);
+  let status: RegistrationStatus = 'pending';
+  if (event.quota && event.quota > 0 && used + needed > event.quota) {
+    if (event.waitlist_enabled) {
+      status = 'waitlisted';
+    } else if (used < event.quota) {
+      throw new Error(`Sisa kuota ${event.quota - used} peserta, pendaftaran ini berisi ${needed} peserta`);
+    } else {
+      throw new Error('Kuota pendaftaran telah penuh');
+    }
   }
 
-  // Generate unique registration code: PREFIX-YEAR-0001
+  // Generate unique registration code: PREFIX-YEAR-0001 (sequence over all statuses)
   const year = new Date().getFullYear();
-  let count = currentEventRegs.length + 1;
+  let count = eventRegs.length + 1;
   const prefix = (event.prefix_code || 'EVT').toUpperCase();
   let code = `${prefix}-${year}-${String(count).padStart(4, '0')}`;
 
@@ -455,7 +506,8 @@ export async function createRegistration(params: {
     schema_snapshot: event.form_schema,
     total_amount: finalAmount,
     payment_proof_path: params.payment_proof_path || '',
-    status: 'pending',
+    status,
+    participant_count: participantCount,
     contact_name: params.contact_name,
     contact_phone: params.contact_phone,
     contact_email: params.contact_email,
@@ -476,7 +528,7 @@ export async function createRegistration(params: {
 
 export async function updateRegistrationStatus(
   id: string,
-  status: 'pending' | 'verified' | 'rejected',
+  status: RegistrationStatus,
   admin_note?: string
 ): Promise<Registration> {
   const supabase = getSupabaseClient();
@@ -499,6 +551,16 @@ export async function updateRegistrationStatus(
   const index = allRegs.findIndex(r => r.id === id);
   if (index === -1) throw new Error('Pendaftaran tidak ditemukan');
 
+  // Mirrors the registrations_quota_on_activation trigger
+  const current = allRegs[index];
+  if (!ACTIVE_STATUSES.includes(current.status) && ACTIVE_STATUSES.includes(status)) {
+    const event = await getEventById(current.event_id);
+    if (event) {
+      const eventRegs = allRegs.filter(r => r.event_id === event.id);
+      assertFitsQuota(event, eventRegs, slotsNeeded(event, current.participant_count));
+    }
+  }
+
   const now = new Date().toISOString();
   const updated: Registration = {
     ...allRegs[index],
@@ -512,6 +574,47 @@ export async function updateRegistrationStatus(
   if (isBrowser) setStorage(STORAGE_KEYS.REGISTRATIONS, allRegs);
 
   return updated;
+}
+
+/** Moves a waitlisted registration to pending when the quota allows it. */
+export async function promoteFromWaitlist(id: string): Promise<Registration> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { data, error } = await supabase.rpc('promote_from_waitlist', { p_registration_id: id });
+    if (error) throw dbError('memindahkan dari daftar tunggu', error);
+    return data as Registration;
+  }
+  const reg = (await getAllRegistrations()).find(r => r.id === id);
+  if (!reg) throw new Error('Pendaftaran tidak ditemukan');
+  if (reg.status !== 'waitlisted') throw new Error('Pendaftaran ini tidak berada di daftar tunggu');
+  return updateRegistrationStatus(id, 'pending');
+}
+
+/** Attendance on the event day. Only verified participants can check in. */
+export async function setCheckIn(id: string, checkedIn: boolean, userId?: string): Promise<Registration> {
+  const checked_in_at = checkedIn ? new Date().toISOString() : null;
+  const checked_in_by = checkedIn ? userId ?? null : null;
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    let query = supabase.from('registrations').update({ checked_in_at, checked_in_by }).eq('id', id);
+    if (checkedIn) query = query.eq('status', 'verified');
+    const { data, error } = await query.select().maybeSingle();
+    if (error) throw dbError('mencatat kehadiran', error);
+    if (!data) throw new Error('Hanya peserta terverifikasi yang dapat check-in');
+    return data as Registration;
+  }
+
+  const allRegs = await getAllRegistrations();
+  const index = allRegs.findIndex(r => r.id === id);
+  if (index === -1) throw new Error('Pendaftaran tidak ditemukan');
+  if (checkedIn && allRegs[index].status !== 'verified') {
+    throw new Error('Hanya peserta terverifikasi yang dapat check-in');
+  }
+  allRegs[index] = { ...allRegs[index], checked_in_at, checked_in_by };
+  memoryRegistrations = allRegs;
+  if (isBrowser) setStorage(STORAGE_KEYS.REGISTRATIONS, allRegs);
+  return allRegs[index];
 }
 
 export async function updateRegistrationData(

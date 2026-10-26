@@ -44,7 +44,10 @@ export interface FormField {
 
 export type PriceType = 'free' | 'fixed' | 'per_participant';
 export type EventStatus = 'draft' | 'open' | 'closed';
-export type RegistrationStatus = 'pending' | 'verified' | 'rejected';
+/** waitlisted: arrived after the quota was full; does not hold a slot */
+export type RegistrationStatus = 'pending' | 'verified' | 'rejected' | 'waitlisted';
+/** registration: one slot per submitted form (e.g. per team); participant: one per person */
+export type QuotaMode = 'registration' | 'participant';
 
 export interface EventPaymentInfo {
   bank_name: string;
@@ -93,6 +96,8 @@ export interface EventItem {
   starts_at?: string;
   registration_deadline?: string;
   quota: number;
+  quota_mode?: QuotaMode;
+  waitlist_enabled?: boolean;
   price_type: PriceType;
   price_amount: number;
   prefix_code: string;
@@ -108,8 +113,10 @@ export interface EventItem {
   /** Owning organization (tenant) */
   organization_id?: string;
   // Computed / aggregated fields
-  /** pending + verified; what counts against the quota */
+  /** pending + verified registrations */
   active_registrations?: number;
+  /** what counts against the quota under quota_mode */
+  slots_used?: number;
   total_registrations?: number;
   verified_registrations?: number;
   pending_registrations?: number;
@@ -127,6 +134,10 @@ export interface Registration {
   payment_proof_path?: string;
   payment_proof_url?: string;
   status: RegistrationStatus;
+  /** People in this registration (rows of the first repeater, min 1) */
+  participant_count?: number;
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
   admin_note?: string;
   contact_name: string;
   contact_phone: string;

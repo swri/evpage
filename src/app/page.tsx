@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getAllEvents, getOrganizationSettings, formatRupiah, formatIndoDate } from '@/lib/store';
+import { getAllEvents, getOrganizationSettings, formatRupiah, formatIndoDate, remainingSlots } from '@/lib/store';
 import { EventItem, OrganizationSettings } from '@/types';
 import {
   Calendar,
@@ -308,7 +308,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 gap-3 sm:gap-6">
               {filteredEvents.map((event) => {
                 const isFree = event.price_type === 'free' || event.price_amount === 0;
-                const remainingQuota = Math.max(0, event.quota - (event.active_registrations || 0));
+                const remainingQuota = remainingSlots(event);
 
                 return (
                   <div
@@ -364,7 +364,7 @@ export default function HomePage() {
                           <div className="flex items-center gap-1.5 sm:gap-2">
                             <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                             <span className="line-clamp-1">
-                              Sisa: <strong className="text-neutral-800 dark:text-neutral-200">{remainingQuota} slot</strong>
+                              {remainingQuota === null ? 'Kuota bebas' : <>Sisa: <strong className="text-neutral-800 dark:text-neutral-200">{remainingQuota} {event.quota_mode === 'participant' ? 'peserta' : 'slot'}</strong></>}
                             </span>
                           </div>
                         </div>

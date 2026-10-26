@@ -8,6 +8,7 @@ import {
   EventItem,
   PriceType,
   EventStatus,
+  QuotaMode,
 } from '@/types';
 import { BUILT_IN_TEMPLATES } from '@/lib/data-service';
 import { saveEvent, formatRupiah } from '@/lib/store';
@@ -117,6 +118,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
     initialEvent?.registration_deadline ? initialEvent.registration_deadline.slice(0, 16) : ''
   );
   const [quota, setQuota] = useState<number>(initialEvent?.quota ?? 32);
+  const [quotaMode, setQuotaMode] = useState<QuotaMode>(initialEvent?.quota_mode ?? 'registration');
+  const [waitlistEnabled, setWaitlistEnabled] = useState<boolean>(initialEvent?.waitlist_enabled ?? false);
   const [priceType, setPriceType] = useState<PriceType>(initialEvent?.price_type || 'fixed');
   const [priceAmount, setPriceAmount] = useState<number>(initialEvent?.price_amount ?? 750000);
   const [prefixCode, setPrefixCode] = useState(initialEvent?.prefix_code || 'MSC');
@@ -326,6 +329,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         starts_at: startsAt ? new Date(startsAt).toISOString() : undefined,
         registration_deadline: deadline ? new Date(deadline).toISOString() : undefined,
         quota,
+        quota_mode: quotaMode,
+        waitlist_enabled: waitlistEnabled,
         price_type: priceType,
         price_amount: priceAmount,
         prefix_code: prefixCode.trim().toUpperCase(),
@@ -1113,16 +1118,37 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
 
             {/* Quota */}
             <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Kuota Maksimal Pendaftar
+              <label htmlFor="quota" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
+                Kuota (0 = tanpa batas)
               </label>
-              <Input
-                type="number"
-                min={1}
-                value={quota}
-                onChange={(e) => setQuota(Number(e.target.value))}
-                className="text-xs h-9"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="quota"
+                  type="number"
+                  min={0}
+                  value={quota}
+                  onChange={(e) => setQuota(Number(e.target.value))}
+                  className="text-xs h-9 w-24"
+                />
+                <select
+                  aria-label="Satuan kuota"
+                  value={quotaMode}
+                  onChange={(e) => setQuotaMode(e.target.value as QuotaMode)}
+                  className="h-9 flex-1 rounded-lg border border-neutral-200 bg-white px-2 text-xs dark:border-neutral-800 dark:bg-neutral-800"
+                >
+                  <option value="registration">per pendaftaran (mis. per tim)</option>
+                  <option value="participant">per peserta (baris repeater)</option>
+                </select>
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                <input
+                  type="checkbox"
+                  checked={waitlistEnabled}
+                  onChange={(e) => setWaitlistEnabled(e.target.checked)}
+                  className="rounded border-neutral-300"
+                />
+                Terima daftar tunggu saat kuota penuh
+              </label>
             </div>
 
             {/* Starts At */}
