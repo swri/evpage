@@ -221,19 +221,63 @@ export async function getEventById(id: string): Promise<EventItem | null> {
   return found || null;
 }
 
+export function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Returns a user-facing error message, or null when the input is valid. */
+export function validateEventInput(data: Partial<EventItem>): string | null {
+  if (data.title !== undefined && !data.title.trim()) return 'Judul event wajib diisi';
+  if (data.quota !== undefined && (!Number.isInteger(data.quota) || data.quota < 0)) {
+    return 'Kuota harus bilangan bulat ≥ 0 (0 = tanpa batas)';
+  }
+  if (data.price_amount !== undefined && (!Number.isFinite(data.price_amount) || data.price_amount < 0)) {
+    return 'Harga tidak boleh negatif';
+  }
+  if (data.starts_at && Number.isNaN(Date.parse(data.starts_at))) return 'Tanggal mulai tidak valid';
+  if (data.registration_deadline && Number.isNaN(Date.parse(data.registration_deadline))) {
+    return 'Batas pendaftaran tidak valid';
+  }
+  if (
+    data.starts_at &&
+    data.registration_deadline &&
+    Date.parse(data.registration_deadline) > Date.parse(data.starts_at)
+  ) {
+    return 'Batas pendaftaran tidak boleh melewati waktu mulai event';
+  }
+  return null;
+}
+
 export async function saveEvent(eventData: Partial<EventItem>): Promise<EventItem> {
   const currentEvents = await getAllEvents();
   const now = new Date().toISOString();
   let updatedEvent: EventItem;
+
+  const validationError = validateEventInput(eventData);
+  if (validationError) throw new Error(validationError);
 
   if (eventData.id) {
     // Update existing event
     const index = currentEvents.findIndex(e => e.id === eventData.id);
     if (index === -1) throw new Error('Event tidak ditemukan');
 
+    let slug = currentEvents[index].slug;
+    if (eventData.slug !== undefined) {
+      slug = slugify(eventData.slug);
+      if (!slug) throw new Error('Slug URL wajib diisi');
+      if (currentEvents.some(e => e.id !== eventData.id && e.slug === slug)) {
+        throw new Error(`Slug URL "${slug}" sudah dipakai event lain`);
+      }
+    }
+
     updatedEvent = {
       ...currentEvents[index],
       ...eventData,
+      slug,
       organizer_name:
         eventData.organizer_name !== undefined
           ? eventData.organizer_name
@@ -247,12 +291,8 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : 'evt-' + Math.random().toString(36).substring(2, 9);
-    const slugBase = (eventData.slug || eventData.title || 'event-baru')
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    
+    const slugBase = slugify(eventData.slug || eventData.title || '') || 'event-baru';
+
     // Ensure slug is unique
     let finalSlug = slugBase;
     let counter = 1;
