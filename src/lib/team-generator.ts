@@ -10,6 +10,7 @@ export interface PlayerParticipant {
   teamOrigin?: string;
   position?: SoccerPosition;
   backNumber?: number | string;
+  level?: number;
 }
 
 export interface GeneratedTeam {
@@ -88,6 +89,13 @@ export const PLAYER_NAME_KEYS = ['player_name', 'nama_pemain', 'name', 'nama'];
 export const PLAYER_ROLE_KEYS = ['position', 'posisi', 'role'];
 export const PLAYER_NUMBER_KEYS = ['back_number', 'no_punggung'];
 export const GROUP_ORIGIN_KEYS = ['team_name', 'nama_tim'];
+/** Numeric skill rating used by balanceLevel (e.g. 1-5) */
+export const PLAYER_LEVEL_KEYS = ['level', 'skill', 'rating', 'tingkat'];
+
+function parseLevel(value: unknown): number | undefined {
+  const n = Number(value);
+  return value !== undefined && Number.isFinite(n) ? n : undefined;
+}
 
 function firstPresent(source: Record<string, unknown>, keys: string[]): unknown {
   for (const key of keys) {
@@ -130,6 +138,7 @@ export function extractPlayersFromRegistrations(registrations: Registration[]): 
             teamOrigin: origin || reg.contact_name,
             position: position !== undefined ? String(position).toUpperCase() : undefined,
             backNumber,
+            level: parseLevel(firstPresent(item, PLAYER_LEVEL_KEYS)),
           });
         });
       }
@@ -145,6 +154,7 @@ export function extractPlayersFromRegistrations(registrations: Registration[]): 
         contactPhone: reg.contact_phone,
         teamOrigin: origin || 'Peserta Mandiri',
         position: position !== undefined ? String(position).toUpperCase() : undefined,
+        level: parseLevel(firstPresent(answers, PLAYER_LEVEL_KEYS)),
       });
     }
   });
@@ -169,7 +179,19 @@ export interface TeamGenerationOptions {
   seed?: string;
   /** Participants matching this are distributed first, one per team in turn. */
   spreadFirst?: (p: PlayerParticipant) => boolean;
+  /** Keep participants with the same key apart where sizes allow (e.g. same club). */
+  separateBy?: (p: PlayerParticipant) => string | undefined;
+  /** Even out the sum of `level` per team. */
+  balanceLevel?: boolean;
+  /** Hard cap per team; throws when teamCount cannot hold everyone. */
+  maxPerTeam?: number;
 }
+
+/** Stored with saved draws so an old result can be replayed with the same code. */
+export const TEAM_ALGORITHM_VERSION = 'balanced-v2';
+
+/** separateBy preset: participants registered under the same team/club name */
+export const bySameOrigin = (p: PlayerParticipant) => p.teamOrigin?.trim().toLowerCase() || undefined;
 
 /**
  * Splits participants into N balanced teams (sizes differ by at most one).
@@ -185,6 +207,17 @@ export function generateBalancedTeams(
 ): GeneratedTeam[] {
   if (!Number.isInteger(teamCount) || teamCount <= 0) throw new Error('Jumlah tim minimal 1');
   if (players.length === 0) return [];
+  if (options.maxPerTeam !== undefined) {
+    if (!Number.isInteger(options.maxPerTeam) || options.maxPerTeam <= 0) {
+      throw new Error('Maksimal anggota per tim minimal 1');
+    }
+    const needed = minimumTeamsFor(players.length, options.maxPerTeam);
+    if (teamCount < needed) {
+      throw new Error(
+        `${players.length} peserta dengan maksimal ${options.maxPerTeam} per tim butuh minimal ${needed} tim`
+      );
+    }
+  }
 
   const random = options.seed ? createSeededRandom(options.seed) : Math.random;
   const spreadFirst = options.spreadFirst ?? isSoccerGoalkeeper;
@@ -213,16 +246,95 @@ export function generateBalancedTeams(
   const priority = shuffleArray(ordered.filter(spreadFirst), random);
   const others = shuffleArray(ordered.filter((p) => !spreadFirst(p)), random);
 
+  const separateBy = options.separateBy;
+  const keyOf = (p: PlayerParticipant) => (separateBy ? separateBy(p) || undefined : undefined);
+
+  // Each filter only narrows the candidate list, and the final pick is the
+  // single random() call, so draws without constraints stay reproducible.
   const assign = (player: PlayerParticipant) => {
     const minSize = Math.min(...teams.map((t) => t.players.length));
-    const candidates = teams.filter((t) => t.players.length === minSize);
+    let candidates = teams.filter((t) => t.players.length === minSize);
+
+    const key = keyOf(player);
+    if (key !== undefined) {
+      const clash = (t: GeneratedTeam) => t.players.filter((p) => keyOf(p) === key).length;
+      const least = Math.min(...candidates.map(clash));
+      candidates = candidates.filter((t) => clash(t) === least);
+    }
+    if (options.balanceLevel) {
+      const lowest = Math.min(...candidates.map(teamLevel));
+      candidates = candidates.filter((t) => teamLevel(t) === lowest);
+    }
     candidates[Math.floor(random() * candidates.length)].players.push(player);
   };
 
-  priority.forEach(assign);
-  others.forEach(assign);
+  // Strongest first, so each next player goes to the currently weakest team
+  const order = (list: PlayerParticipant[]) => {
+    const leveled = options.balanceLevel ? sortByLevelDesc(list) : list;
+    return separateBy ? groupLargestFirst(leveled, keyOf) : leveled;
+  };
+  order(priority).forEach(assign);
+  order(others).forEach(assign);
 
   return teams;
+}
+
+/**
+ * Deals members of the same group consecutively, biggest group first.
+ * A plain random order can paint the greedy step into a corner where the
+ * only team left with room already holds that club.
+ */
+function groupLargestFirst(
+  players: PlayerParticipant[],
+  keyOf: (p: PlayerParticipant) => string | undefined
+): PlayerParticipant[] {
+  const groups = new Map<string, PlayerParticipant[]>();
+  const loose: PlayerParticipant[] = [];
+  for (const p of players) {
+    const key = keyOf(p);
+    if (key === undefined) loose.push(p);
+    else groups.set(key, [...(groups.get(key) || []), p]);
+  }
+  // Map keeps first-seen order, which already reflects the seeded shuffle
+  const sorted = [...groups.values()].sort((a, b) => b.length - a.length);
+  return [...sorted.flat(), ...loose];
+}
+
+/** Stable on equal levels, so the earlier shuffle still decides ties. */
+function sortByLevelDesc(players: PlayerParticipant[]): PlayerParticipant[] {
+  return players
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (b.p.level ?? 0) - (a.p.level ?? 0) || a.i - b.i)
+    .map((x) => x.p);
+}
+
+export function teamLevel(team: GeneratedTeam): number {
+  return team.players.reduce((sum, p) => sum + (p.level ?? 0), 0);
+}
+
+/**
+ * Pairs of teammates sharing a separateBy key (e.g. from the same club).
+ * Shown to organizers so they can see when separation was impossible.
+ */
+export function countSeparationConflicts(
+  teams: GeneratedTeam[],
+  separateBy: (p: PlayerParticipant) => string | undefined
+): number {
+  let conflicts = 0;
+  for (const team of teams) {
+    const counts = new Map<string, number>();
+    for (const p of team.players) {
+      const key = separateBy(p);
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    for (const n of counts.values()) conflicts += (n * (n - 1)) / 2;
+  }
+  return conflicts;
+}
+
+/** Smallest number of teams that respects a per-team maximum. */
+export function minimumTeamsFor(playerCount: number, maxPerTeam: number): number {
+  return Math.ceil(playerCount / Math.max(1, maxPerTeam));
 }
 
 /**

@@ -24,6 +24,9 @@ import {
   formatTeamsForWhatsApp,
   formatTournamentForWhatsApp,
   generateSeed,
+  bySameOrigin,
+  countSeparationConflicts,
+  teamLevel,
 } from '@/lib/team-generator';
 import { sanitizeCsvCell } from '@/lib/export';
 import { Registration } from '@/types';
@@ -78,6 +81,16 @@ export function RandomTeamModal({
   const [usedSeed, setUsedSeed] = useState('');
   const [manuallyAdjusted, setManuallyAdjusted] = useState(false);
 
+  // Fairness constraints
+  const [separateClubs, setSeparateClubs] = useState(false);
+  const [balanceLevel, setBalanceLevel] = useState(false);
+  const [maxPerTeam, setMaxPerTeam] = useState<string>('');
+  const hasLevels = useMemo(() => allPlayers.some((p) => p.level !== undefined), [allPlayers]);
+  const separationConflicts = useMemo(
+    () => (separateClubs ? countSeparationConflicts(generatedTeams, bySameOrigin) : 0),
+    [separateClubs, generatedTeams]
+  );
+
   // Manual player move target
   const [selectedPlayer, setSelectedPlayer] = useState<{
     teamId: string;
@@ -99,7 +112,12 @@ export function RandomTeamModal({
     setTimeout(() => {
       try {
         const seed = seedInput.trim().toUpperCase() || generateSeed();
-        const teams = generateBalancedTeams(allPlayers, teamCount, teamNames, { seed });
+        const teams = generateBalancedTeams(allPlayers, teamCount, teamNames, {
+          seed,
+          separateBy: separateClubs ? bySameOrigin : undefined,
+          balanceLevel: balanceLevel && hasLevels,
+          maxPerTeam: maxPerTeam ? Number(maxPerTeam) : undefined,
+        });
         setGeneratedTeams(teams);
         setUsedSeed(seed);
         setSeedInput('');
@@ -345,6 +363,43 @@ export function RandomTeamModal({
                 />
                 <span>Hanya Verified ({candidateRegistrations.length})</span>
               </label>
+
+              <label className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={separateClubs}
+                  onChange={(e) => setSeparateClubs(e.target.checked)}
+                  className="rounded border-neutral-300 text-neutral-900"
+                />
+                <span>Pisahkan asal tim/klub yang sama</span>
+              </label>
+
+              <label
+                className={`flex items-center gap-1.5 cursor-pointer ${hasLevels ? 'text-neutral-600 dark:text-neutral-400' : 'text-neutral-400 dark:text-neutral-600'}`}
+                title={hasLevels ? undefined : 'Tambahkan sub-field "level" (angka) di formulir untuk memakai opsi ini'}
+              >
+                <input
+                  type="checkbox"
+                  checked={balanceLevel && hasLevels}
+                  disabled={!hasLevels}
+                  onChange={(e) => setBalanceLevel(e.target.checked)}
+                  className="rounded border-neutral-300 text-neutral-900"
+                />
+                <span>Seimbangkan level</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+                <span>Maks/tim</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={maxPerTeam}
+                  onChange={(e) => setMaxPerTeam(e.target.value)}
+                  placeholder="-"
+                  aria-label="Maksimal anggota per tim"
+                  className="h-8 w-14 rounded-lg border border-neutral-200 bg-white px-2 text-xs dark:border-neutral-800 dark:bg-neutral-800"
+                />
+              </label>
             </div>
           )}
         </div>
@@ -378,6 +433,9 @@ export function RandomTeamModal({
                     <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
                       Seed: <strong className="font-mono text-neutral-800 dark:text-neutral-200">{usedSeed}</strong>
                       {manuallyAdjusted && ' (diubah manual)'}
+                      {separateClubs && generatedTeams.length > 0 && (
+                        <> &bull; {separationConflicts === 0 ? 'semua klub terpisah' : `${separationConflicts} pasangan satu klub tak terhindarkan`}</>
+                      )}
                     </span>
                   )}
 
@@ -459,6 +517,7 @@ export function RandomTeamModal({
                             </h4>
                             <span className="text-[11px] text-neutral-400">
                               {team.players.length} Pemain &bull; {gks.length} Kiper (GK)
+                              {balanceLevel && hasLevels && <> &bull; Level {teamLevel(team)}</>}
                             </span>
                           </div>
 
