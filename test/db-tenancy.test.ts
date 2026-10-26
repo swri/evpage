@@ -88,12 +88,10 @@ test('invitation flow: only org admins invite, only the invitee accepts', async 
 });
 
 test('an org admin cannot promote anyone to owner', async () => {
-  await t.sql(, [orgA, bob]);
-  await assert.rejects(
-    t.user(bob, , [orgA, bob]),
-    /row-level security/
-  );
-  await t.sql(, [orgA, bob]);
+  const setRole = `UPDATE public.organization_members SET role = $3 WHERE organization_id = $1 AND user_id = $2`;
+  await t.sql(setRole, [orgA, bob, 'admin']);
+  await assert.rejects(t.user(bob, setRole, [orgA, bob, 'owner']), /row-level security/);
+  await t.sql(setRole, [orgA, bob, 'member']);
 });
 
 test('co-members can see each other profiles, outsiders cannot', async () => {
