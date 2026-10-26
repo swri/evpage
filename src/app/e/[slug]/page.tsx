@@ -136,7 +136,8 @@ function EventRegistrationContent({
     );
   }
 
-  const isClosed = event.status === 'closed';
+  // Drafts are not published yet; createRegistration rejects anything but 'open'
+  const isClosed = event.status !== 'open';
   const isDeadlinePassed =
     event.registration_deadline && new Date(event.registration_deadline) < new Date();
   const currentCount = event.total_registrations || 0;
