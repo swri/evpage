@@ -36,6 +36,7 @@ import {
   Shuffle,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { sanitizeCsvRow } from '@/lib/export';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 function EventRegistrationsContent({
@@ -299,7 +300,7 @@ function EventRegistrationsContent({
       return;
     }
 
-    const rows = registrations.map((r) => ({
+    const rows = registrations.map((r) => sanitizeCsvRow({
       'Kode': r.code,
       'Nama': r.contact_name,
       'WhatsApp': r.contact_phone,
