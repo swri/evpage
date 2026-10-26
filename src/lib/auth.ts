@@ -1,11 +1,13 @@
-import { createClient } from './supabase/client';
+import { createClient } from './supabase/client.ts';
 
 export interface AdminUser {
   id: string;
   email: string;
   full_name: string;
   organization_name?: string;
+  /** Legacy demo accounts only; new accounts store passwordHash instead */
   password?: string;
+  passwordHash?: string;
   created_at: string;
 }
 
@@ -22,6 +24,7 @@ export interface AdminSession {
 const ADMIN_STORAGE_KEY = 'evpage_admin_auth';
 const REGISTERED_ADMINS_KEY = 'evpage_registered_admins';
 
+// Demo-only account. It is never accepted when Supabase is configured.
 const DEFAULT_DEMO_ADMIN: AdminUser = {
   id: 'admin-demo-uuid-1',
   email: 'admin@evpage.com',
@@ -30,6 +33,39 @@ const DEFAULT_DEMO_ADMIN: AdminUser = {
   organization_name: 'EvPage Central',
   created_at: '2026-01-01T00:00:00.000Z',
 };
+
+/**
+ * SHA-256 hex digest. Local accounts are a demo convenience, but the
+ * password still should not sit in localStorage as plain text.
+ */
+export async function hashPassword(email: string, password: string): Promise<string> {
+  const bytes = new TextEncoder().encode(`evpage:${email}:${password}`);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function localPasswordMatches(admin: AdminUser, password: string): Promise<boolean> {
+  if (admin.passwordHash) {
+    return admin.passwordHash === (await hashPassword(admin.email.toLowerCase(), password));
+  }
+  return admin.password !== undefined && admin.password === password;
+}
+
+function randomToken(prefix: string): string {
+  const id =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2);
+  return `${prefix}-${id}`;
+}
+
+function persistSession(session: AdminSession) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(session));
+  }
+}
 
 /**
  * Get all registered administrators (from localStorage, fallback to default demo admin)
@@ -76,7 +112,60 @@ export async function registerAdmin(params: {
     return { success: false, error: 'Kata sandi minimal 6 karakter.' };
   }
 
-  // Check if already registered
+  const supabase = createClient();
+
+  if (supabase) {
+    // Database mode: Supabase Auth is the only account store
+    const { data, error } = await supabase.auth.signUp({
+      email: emailClean,
+      password: params.password,
+      options: {
+        data: {
+          full_name: nameClean,
+          organization_name: orgClean,
+        },
+      },
+    });
+
+    if (error || !data.user) {
+      return { success: false, error: error?.message || 'Pendaftaran akun gagal.' };
+    }
+
+    const { error: adminError } = await supabase.from('admins').insert({
+      user_id: data.user.id,
+      full_name: nameClean,
+      email: emailClean,
+    });
+    if (adminError) {
+      console.error('Supabase admins insert error:', adminError);
+      return {
+        success: false,
+        error: 'Akun dibuat, tetapi belum terdaftar sebagai penyelenggara. Hubungi pengelola platform.',
+      };
+    }
+
+    if (!data.session) {
+      // Email confirmation is enabled on the Supabase project
+      return {
+        success: false,
+        error: 'Akun berhasil dibuat. Cek email Anda untuk konfirmasi, lalu masuk.',
+      };
+    }
+
+    const session: AdminSession = {
+      user: {
+        id: data.user.id,
+        email: emailClean,
+        full_name: nameClean,
+        organization_name: orgClean || nameClean,
+      },
+      token: data.session.access_token,
+    };
+    persistSession(session);
+    return { success: true, session };
+  }
+
+  // Demo mode: accounts live in this browser only
   const currentAdmins = getRegisteredAdmins();
   if (currentAdmins.some((a) => a.email.toLowerCase() === emailClean)) {
     return {
@@ -85,49 +174,17 @@ export async function registerAdmin(params: {
     };
   }
 
-  const supabase = createClient();
-  let supabaseUserId = '';
-
-  if (supabase) {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: emailClean,
-        password: params.password,
-        options: {
-          data: {
-            full_name: nameClean,
-            organization_name: orgClean,
-          },
-        },
-      });
-
-      if (!error && data.user) {
-        supabaseUserId = data.user.id;
-        // Insert into admins table
-        await supabase.from('admins').insert({
-          user_id: data.user.id,
-          full_name: nameClean,
-          organization_name: orgClean,
-          email: emailClean,
-        });
-      }
-    } catch (err) {
-      console.warn('Supabase registration fallback to local storage:', err);
-    }
-  }
-
   const newAdmin: AdminUser = {
-    id: supabaseUserId || 'admin-' + Math.random().toString(36).substring(2, 9),
+    id: randomToken('admin'),
     email: emailClean,
     full_name: nameClean,
     organization_name: orgClean || nameClean,
-    password: params.password,
+    passwordHash: await hashPassword(emailClean, params.password),
     created_at: new Date().toISOString(),
   };
 
-  const updatedAdmins = [...currentAdmins, newAdmin];
   if (typeof window !== 'undefined') {
-    localStorage.setItem(REGISTERED_ADMINS_KEY, JSON.stringify(updatedAdmins));
+    localStorage.setItem(REGISTERED_ADMINS_KEY, JSON.stringify([...currentAdmins, newAdmin]));
   }
 
   const session: AdminSession = {
@@ -137,15 +194,14 @@ export async function registerAdmin(params: {
       full_name: newAdmin.full_name,
       organization_name: newAdmin.organization_name,
     },
-    token: 'bearer-token-' + Math.random().toString(36).substring(2),
+    token: randomToken('local-session'),
   };
-
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(session));
-  }
+  persistSession(session);
 
   return { success: true, session };
 }
+
+const INVALID_LOGIN = 'Email atau kata sandi salah. Silakan coba lagi atau daftar akun admin baru.';
 
 /**
  * Log in an Administrator
@@ -158,91 +214,58 @@ export async function loginAdmin(
   const supabase = createClient();
 
   if (supabase) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailClean,
-        password,
-      });
-
-      if (!error && data.user) {
-        // Check if user is in admins table
-        const { data: adminData } = await supabase
-          .from('admins')
-          .select('*')
-          .eq('user_id', data.user.id)
-          .single();
-
-        const session: AdminSession = {
-          user: {
-            id: data.user.id,
-            email: data.user.email || emailClean,
-            full_name: adminData?.full_name || 'Admin',
-            organization_name: adminData?.organization_name || 'Penyelenggara Event',
-          },
-          token: data.session?.access_token || 'token',
-        };
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(session));
-        }
-
-        return { success: true, session };
-      }
-    } catch (err: unknown) {
-      console.warn('Supabase auth failed, trying registered admins list:', err);
+    // Database mode: no local or demo fallback, otherwise any failed
+    // Supabase login could still be "rescued" by a browser-side account.
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: emailClean,
+      password,
+    });
+    if (error || !data.user) {
+      return { success: false, error: INVALID_LOGIN };
     }
-  }
 
-  // Check local registered admins list
-  const registeredAdmins = getRegisteredAdmins();
-  const matchedAdmin = registeredAdmins.find(
-    (a) => a.email.toLowerCase() === emailClean && a.password === password
-  );
+    const { data: adminData } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('user_id', data.user.id)
+      .maybeSingle();
 
-  if (matchedAdmin) {
+    if (!adminData) {
+      await supabase.auth.signOut();
+      return { success: false, error: 'Akun ini belum terdaftar sebagai penyelenggara.' };
+    }
+
     const session: AdminSession = {
       user: {
-        id: matchedAdmin.id,
-        email: matchedAdmin.email,
-        full_name: matchedAdmin.full_name,
-        organization_name: matchedAdmin.organization_name || matchedAdmin.full_name,
+        id: data.user.id,
+        email: data.user.email || emailClean,
+        full_name: adminData.full_name || 'Admin',
+        organization_name: adminData.organization_name || 'Penyelenggara Event',
       },
-      token: 'session-token-' + Math.random().toString(36).substring(2),
+      token: data.session?.access_token || '',
     };
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(session));
-    }
-
+    persistSession(session);
     return { success: true, session };
   }
 
-  // Quick fallback for demo accounts
-  if (
-    (emailClean === 'admin@evpage.com' && (password === 'admin123' || password === 'password123')) ||
-    (password === 'admin123' && emailClean.includes('admin'))
-  ) {
-    const demoSession: AdminSession = {
-      user: {
-        id: 'admin-demo-uuid-1',
-        email: emailClean || 'admin@evpage.com',
-        full_name: 'Administrator Utama',
-        organization_name: 'EvPage Central',
-      },
-      token: 'demo-bearer-token-xyz',
-    };
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(demoSession));
-    }
-
-    return { success: true, session: demoSession };
+  // Demo mode: check the browser-local account list (includes the demo admin)
+  const registeredAdmins = getRegisteredAdmins();
+  const candidate = registeredAdmins.find((a) => a.email.toLowerCase() === emailClean);
+  if (!candidate || !(await localPasswordMatches(candidate, password))) {
+    return { success: false, error: INVALID_LOGIN };
   }
 
-  return {
-    success: false,
-    error: 'Email atau kata sandi salah. Silakan coba lagi atau daftar akun admin baru.',
+  const session: AdminSession = {
+    user: {
+      id: candidate.id,
+      email: candidate.email,
+      full_name: candidate.full_name,
+      organization_name: candidate.organization_name || candidate.full_name,
+    },
+    token: randomToken('local-session'),
   };
+  persistSession(session);
+  return { success: true, session };
 }
 
 export function getCurrentAdminSession(): AdminSession | null {
@@ -260,7 +283,9 @@ export async function logoutAdmin(): Promise<void> {
   if (supabase) {
     try {
       await supabase.auth.signOut();
-    } catch {}
+    } catch (err) {
+      console.warn('Supabase signOut failed:', err);
+    }
   }
   if (typeof window !== 'undefined') {
     localStorage.removeItem(ADMIN_STORAGE_KEY);
