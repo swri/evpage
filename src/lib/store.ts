@@ -404,6 +404,25 @@ export async function getRegistrationsByEvent(eventId: string): Promise<Registra
   return all.filter(r => r.event_id === eventId);
 }
 
+/**
+ * Total fee for a registration, derived only from the event config and answers.
+ * per_participant counts rows of the first repeater field (minimum 1).
+ */
+export function calculateRegistrationAmount(
+  event: Pick<EventItem, 'price_type' | 'price_amount' | 'form_schema'>,
+  answers: Record<string, any>
+): number {
+  if (event.price_type === 'free') return 0;
+  const price = Math.max(0, Number(event.price_amount) || 0);
+  if (event.price_type === 'per_participant') {
+    const repeaterField = event.form_schema.find(f => f.type === 'repeater');
+    const rows = repeaterField ? answers?.[repeaterField.id] : undefined;
+    const participantCount = Array.isArray(rows) ? rows.length : 1;
+    return price * Math.max(1, participantCount);
+  }
+  return price;
+}
+
 export async function createRegistration(params: {
   event_id: string;
   answers: Record<string, any>;
@@ -411,7 +430,6 @@ export async function createRegistration(params: {
   contact_phone: string;
   contact_email: string;
   payment_proof_path?: string;
-  total_amount?: number;
 }): Promise<Registration> {
   const event = await getEventById(params.event_id);
   if (!event) throw new Error('Event tidak ditemukan');
@@ -446,20 +464,8 @@ export async function createRegistration(params: {
     code = `${prefix}-${year}-${String(count).padStart(4, '0')}`;
   }
 
-  // Calculate total amount
-  let calculatedAmount = event.price_amount;
-  if (event.price_type === 'free') {
-    calculatedAmount = 0;
-  } else if (event.price_type === 'per_participant') {
-    // If repeater exists, count items
-    const repeaterField = event.form_schema.find(f => f.type === 'repeater');
-    if (repeaterField && Array.isArray(params.answers[repeaterField.id])) {
-      const participantCount = params.answers[repeaterField.id].length;
-      calculatedAmount = event.price_amount * Math.max(1, participantCount);
-    }
-  }
-
-  const finalAmount = params.total_amount ?? calculatedAmount;
+  // Always price on our side; never trust an amount coming from the form
+  const finalAmount = calculateRegistrationAmount(event, params.answers);
 
   const newReg: Registration = {
     id:

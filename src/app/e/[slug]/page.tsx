@@ -6,6 +6,7 @@ import {
   getEventBySlug,
   getOrganizationSettings,
   createRegistration,
+  calculateRegistrationAmount,
   formatRupiah,
   formatIndoDate,
   buildWhatsAppLink,
@@ -142,16 +143,7 @@ function EventRegistrationContent({
   const isQuotaFull = event.quota > 0 && currentCount >= event.quota;
   const remainingQuota = Math.max(0, event.quota - currentCount);
 
-  // Calculate Total Cost
-  let totalCost = event.price_amount;
-  if (event.price_type === 'free') {
-    totalCost = 0;
-  } else if (event.price_type === 'per_participant') {
-    const repeaterField = event.form_schema.find((f) => f.type === 'repeater');
-    if (repeaterField && Array.isArray(answers[repeaterField.id])) {
-      totalCost = event.price_amount * Math.max(1, answers[repeaterField.id].length);
-    }
-  }
+  const totalCost = calculateRegistrationAmount(event, answers);
 
   // Handle Proof Upload
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,7 +278,6 @@ function EventRegistrationContent({
         contact_phone: detectedPhone,
         contact_email: detectedEmail,
         payment_proof_path: paymentProof || undefined,
-        total_amount: totalCost,
       });
 
       setCreatedRegistration(newRegistration);
