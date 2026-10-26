@@ -310,7 +310,8 @@ function EventRegistrationContent({
   };
 
   // WhatsApp Link for Confirmation
-  const waAdminPhone = orgSettings?.wa_number || '6281234567890';
+  // No dummy fallback: a fake number would route payment proofs to a stranger
+  const waAdminPhone = orgSettings?.wa_number || '';
   const waLink = createdRegistration
     ? buildWhatsAppLink(waAdminPhone, event.wa_template, {
       event: event.title,
@@ -688,15 +689,15 @@ function EventRegistrationContent({
                         <div className="space-y-1 text-xs">
                           <div className="text-neutral-500">Bank:</div>
                           <div className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
-                            {orgSettings?.payment_info.bank_name || 'BCA'}
+                            {orgSettings?.payment_info.bank_name || '-'}
                           </div>
                           <div className="text-neutral-500 mt-2">Nomor Rekening:</div>
                           <div className="font-mono font-bold text-sm text-neutral-900 dark:text-neutral-100">
-                            {orgSettings?.payment_info.account_number || '1234567890'}
+                            {orgSettings?.payment_info.account_number || 'Belum diatur panitia'}
                           </div>
                           <div className="text-neutral-500 mt-2">Atas Nama:</div>
                           <div className="font-medium text-neutral-800 dark:text-neutral-200">
-                            {orgSettings?.payment_info.account_holder || 'Panitia Event'}
+                            {orgSettings?.payment_info.account_holder || '-'}
                           </div>
                         </div>
                       </div>
