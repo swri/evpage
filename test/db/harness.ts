@@ -26,7 +26,9 @@ const SUPABASE_STUB = `
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     bucket_id TEXT REFERENCES storage.buckets(id),
     name TEXT,
-    owner UUID
+    owner UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    metadata JSONB
   );
   ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
   CREATE FUNCTION storage.foldername(name TEXT) RETURNS TEXT[] LANGUAGE sql IMMUTABLE AS $$
