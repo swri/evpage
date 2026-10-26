@@ -7,7 +7,9 @@ import {
   getMyInvitations,
   getMyOrganizations,
   resolveActiveOrganization,
+  roleCan,
   setActiveOrganizationId,
+  type Permission,
   type AccessContext,
   type MyOrganization,
   type OrgInvitation,
@@ -23,6 +25,8 @@ interface OrgContextValue {
   setActiveOrg: (id: string) => void;
   refresh: () => Promise<void>;
   canManageEvent: (event: { organization_id?: string; created_by?: string }) => boolean;
+  /** Role permission inside the event's organization (UI gating; RLS enforces) */
+  can: (permission: Permission, event: { organization_id?: string; created_by?: string } | null | undefined) => boolean;
 }
 
 const OrgContext = createContext<OrgContextValue | null>(null);
@@ -75,6 +79,11 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
       setActiveOrg,
       refresh,
       canManageEvent: (event) => canManageEventIn(event, ctx),
+      can: (permission, event) => {
+        if (!event || !canManageEventIn(event, ctx)) return false;
+        if (isPlatformAdmin || !event.organization_id) return true;
+        return roleCan(organizations.find((o) => o.id === event.organization_id)?.role, permission);
+      },
     };
   }, [session, organizations, activeOrg, invitations, loading, setActiveOrg, refresh]);
 

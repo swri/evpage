@@ -18,7 +18,7 @@ import {
   type GroupDraw,
   type PublishedTeam,
 } from '@/lib/draws';
-import { getOrganizationMembers, requiredApprovals, type OrgMember } from '@/lib/orgs';
+import { getOrganizationMembers, requiredApprovals, roleCan, type OrgMember } from '@/lib/orgs';
 import { TEAM_ALGORITHM_VERSION, type GeneratedTeam, type PlayerParticipant } from '@/lib/team-generator';
 import type { EventItem } from '@/types';
 
@@ -78,7 +78,9 @@ export function DrawGovernancePanel({ event, workingTeams, seed, options, manual
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reload]);
 
-  const needed = requiredApprovals(members.length);
+  // Quorum = members whose role may manage draws (matches org_member_count in SQL)
+  const managers = members.filter((m) => roleCan(m.role, 'draws.manage'));
+  const needed = requiredApprovals(managers.length);
   const nameOf = (userId?: string | null) => {
     const m = members.find((x) => x.user_id === userId);
     return m?.full_name || m?.email || 'Panitia';
@@ -154,7 +156,7 @@ export function DrawGovernancePanel({ event, workingTeams, seed, options, manual
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-neutral-600 dark:text-neutral-400">
             Belum dipublikasikan. Setelah dipublikasikan, perubahan memerlukan {needed} persetujuan
-            {needed > 1 ? ` dari ${members.length} panitia` : ' (Anda satu-satunya panitia)'}.
+            {needed > 1 ? ` dari ${managers.length} panitia` : ' (Anda satu-satunya panitia)'}.
           </span>
           <Button size="sm" disabled={busy || workingTeams.length === 0} onClick={handlePublish} className="gap-1.5">
             <BadgeCheck className="h-3.5 w-3.5" />

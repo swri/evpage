@@ -16,7 +16,7 @@ function EditEventContent({
 
   const [event, setEvent] = useState<EventItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const { canManageEvent, loading: orgLoading } = useOrg();
+  const { can, loading: orgLoading } = useOrg();
 
   useEffect(() => {
     getEventById(id)
@@ -42,7 +42,8 @@ function EditEventContent({
     );
   }
 
-  if (!canManageEvent(event)) {
+  // Cashier / check-in roles can view registrations but not edit the event
+  if (!can('events.manage', event)) {
     return (
       <div className="p-12 text-center text-neutral-500">
         Anda tidak memiliki akses untuk mengubah event ini.

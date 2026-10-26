@@ -5,7 +5,7 @@ import type { AdminSession } from './auth.ts';
 import type { EventItem } from '../types/index.ts';
 import type { GeneratedTeam, PlayerParticipant } from './team-generator.ts';
 import { dbError, localTable, newId } from './local-db.ts';
-import { getOrganizationMembers, requiredApprovals } from './orgs.ts';
+import { getOrganizationMembers, requiredApprovals, roleCan } from './orgs.ts';
 import { createClient as getSupabaseClient } from './supabase/client.ts';
 
 /** Team as stored/published: no phone numbers or registration codes */
@@ -102,12 +102,17 @@ function requireSession(session: AdminSession | null): AdminSession {
   return session;
 }
 
+/** Members whose role may manage draws; they are also the approval quorum. */
+async function drawManagers(orgId: string) {
+  return (await getOrganizationMembers(orgId)).filter((m) => roleCan(m.role, 'draws.manage'));
+}
+
 async function assertLocalMember(orgId: string, session: AdminSession) {
   const members = await getOrganizationMembers(orgId);
-  if (!session.user.is_platform_admin && !members.some((m) => m.user_id === session.user.id)) {
-    throw new Error('Hasil undian tidak ditemukan');
-  }
-  return members;
+  const me = members.find((m) => m.user_id === session.user.id);
+  if (!session.user.is_platform_admin && !me) throw new Error('Hasil undian tidak ditemukan');
+  if (me && !roleCan(me.role, 'draws.manage')) throw new Error('Peran Anda tidak boleh mengelola hasil undian');
+  return drawManagers(orgId);
 }
 
 // ---------- reads ----------
@@ -243,7 +248,7 @@ function applyLocal(requestId: string): 'applied' | 'stale' {
 async function resolveLocal(requestId: string): Promise<ChangeStatus> {
   const req = requestTable.all().find((r) => r.id === requestId)!;
   const draw = drawTable.all().find((d) => d.id === req.draw_id)!;
-  const members = (await getOrganizationMembers(draw.organization_id)).length;
+  const members = (await drawManagers(draw.organization_id)).length;
   const votes = voteTable.all().filter((v) => v.request_id === requestId);
   const outcome = resolveOutcome({
     yes: votes.filter((v) => v.approve).length,

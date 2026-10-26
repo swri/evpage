@@ -103,6 +103,18 @@ test('four organizers need three approvals; competing requests go stale', async 
   await assert.rejects(requestDrawChange(draw, teams('dari versi lama'), {}, members[0]), /sudah berubah/);
 });
 
+test('cashier/check-in members neither vote nor count toward the quorum', async () => {
+  const { members, event } = await orgWith(2);
+  const kasir = session(`kasir-${Math.random().toString(36).slice(2, 6)}`);
+  const inv = await inviteMember(event.organization_id!, kasir.user.email, 'cashier', members[0]);
+  await acceptInvitation(inv.id, kasir);
+
+  const draw = await publishDraw(event, teams('Awal'), { algorithm: 'balanced-v2' }, members[0]);
+  const { request } = await requestDrawChange(draw, teams('Usul'), {}, members[0]);
+  assert.equal(request.required_approvals, 2, '3 members, but only 2 manage draws');
+  await assert.rejects(voteDrawChange(request.id, true, kasir), /tidak boleh mengelola hasil undian/);
+});
+
 test('public draw hides drafts and exposes published teams', async () => {
   const { members, event } = await orgWith(1);
   await publishDraw(event, teams('Publik'), { algorithm: 'balanced-v2', seed: 'PUB' }, members[0]);

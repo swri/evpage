@@ -8,7 +8,28 @@ import { DEMO_ORG_ID, INITIAL_ORGANIZATION_SETTINGS } from './data-service.ts';
 import { dbError, getStorage, isBrowser, localTable, newId, setStorage } from './local-db.ts';
 import { createClient as getSupabaseClient } from './supabase/client.ts';
 
-export type OrgRole = 'owner' | 'admin' | 'member';
+export type OrgRole = 'owner' | 'admin' | 'member' | 'cashier' | 'checkin';
+
+export type Permission =
+  | 'org.manage'
+  | 'events.manage'
+  | 'registrations.edit'
+  | 'registrations.verify'
+  | 'registrations.checkin'
+  | 'draws.manage';
+
+/** Mirrors public.role_has_permission() in the role_permissions migration. */
+export const ROLE_PERMISSIONS: Record<OrgRole, Permission[]> = {
+  owner: ['org.manage', 'events.manage', 'registrations.edit', 'registrations.verify', 'registrations.checkin', 'draws.manage'],
+  admin: ['org.manage', 'events.manage', 'registrations.edit', 'registrations.verify', 'registrations.checkin', 'draws.manage'],
+  member: ['events.manage', 'registrations.edit', 'registrations.verify', 'registrations.checkin', 'draws.manage'],
+  cashier: ['registrations.verify'],
+  checkin: ['registrations.checkin'],
+};
+
+export function roleCan(role: OrgRole | undefined | null, permission: Permission): boolean {
+  return !!role && ROLE_PERMISSIONS[role]?.includes(permission);
+}
 
 export interface Organization extends OrganizationSettings {
   id: string;
@@ -45,11 +66,13 @@ export const ROLE_LABELS: Record<OrgRole, string> = {
   owner: 'Pemilik',
   admin: 'Admin',
   member: 'Panitia',
+  cashier: 'Kasir (verifikasi bayar)',
+  checkin: 'Petugas Check-in',
 };
 
 /** owner/admin manage members, invitations and organization settings */
 export function canManageOrg(role: OrgRole | undefined | null): boolean {
-  return role === 'owner' || role === 'admin';
+  return roleCan(role, 'org.manage');
 }
 
 /**

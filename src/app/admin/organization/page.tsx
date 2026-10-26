@@ -19,6 +19,7 @@ import {
   removeMember,
   requiredApprovals,
   revokeInvitation,
+  roleCan,
   setActiveOrganizationId,
   type OrgInvitation,
   type OrgMember,
@@ -36,7 +37,7 @@ export default function OrganizationPage() {
   const [pendingInvites, setPendingInvites] = useState<OrgInvitation[]>([]);
   const [newOrgName, setNewOrgName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
+  const [inviteRole, setInviteRole] = useState<Exclude<OrgRole, 'owner'>>('member');
   const [busy, setBusy] = useState(false);
 
   const isManager = canManageOrg(activeOrg?.role) || !!session?.user.is_platform_admin;
@@ -100,7 +101,9 @@ export default function OrganizationPage() {
     );
   }
 
-  const approvalsNeeded = requiredApprovals(members.length);
+  // Only roles that may manage draws form the approval quorum
+  const drawManagers = members.filter((m) => roleCan(m.role, 'draws.manage')).length;
+  const approvalsNeeded = requiredApprovals(drawManagers);
 
   return (
     <div className="space-y-6 max-w-4xl animate-in fade-in duration-200">
@@ -206,7 +209,7 @@ export default function OrganizationPage() {
             </ul>
 
             <p className="mt-4 rounded-lg bg-neutral-50 p-3 text-[11px] text-neutral-600 dark:bg-neutral-800/50 dark:text-neutral-400">
-              Aturan perubahan hasil undian yang sudah dipublikasikan: dengan {members.length} penyelenggara,
+              Aturan perubahan hasil undian yang sudah dipublikasikan: dengan {drawManagers} panitia pengelola undian,
               perlu <strong>{approvalsNeeded} persetujuan</strong>
               {approvalsNeeded > 1 ? ' (termasuk pengaju)' : ' (langsung berlaku)'}.
             </p>
@@ -230,11 +233,13 @@ export default function OrganizationPage() {
                 />
                 <select
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
+                  onChange={(e) => setInviteRole(e.target.value as Exclude<OrgRole, 'owner'>)}
                   aria-label="Peran yang diundang"
                   className="h-9 rounded-lg border border-neutral-200 bg-white px-2 text-xs dark:border-neutral-800 dark:bg-neutral-800"
                 >
                   <option value="member">{ROLE_LABELS.member}</option>
+                  <option value="cashier">{ROLE_LABELS.cashier}</option>
+                  <option value="checkin">{ROLE_LABELS.checkin}</option>
                   <option value="admin">{ROLE_LABELS.admin}</option>
                 </select>
                 <Button type="submit" isLoading={busy}>
