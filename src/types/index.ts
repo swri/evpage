@@ -104,6 +104,8 @@ export interface EventItem {
   contact_config?: EventContactConfig;
   form_schema: FormField[];
   wa_template: string;
+  /** Per-event message overrides keyed by NotificationKind (lib/notifications) */
+  notification_templates?: Partial<Record<string, string>>;
   success_message: string;
   status: EventStatus;
   created_at: string;

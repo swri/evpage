@@ -45,6 +45,7 @@ import { sanitizeCsvRow } from '@/lib/export';
 import { useOrg } from '@/components/admin/org-context';
 import { PaymentProofPreview, PaymentProofThumb } from '@/components/admin/payment-proof-preview';
 import { resolveEventType } from '@/lib/event-types';
+import { buildParticipantMessage } from '@/lib/notifications';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
@@ -69,6 +70,7 @@ function EventRegistrationsContent({
   const [accessDenied, setAccessDenied] = useState(false);
   const { canManageEvent, loading: orgLoading, session } = useOrg();
   const eventTypeModule = useMemo(() => resolveEventType(event), [event]);
+  const [promotedIds, setPromotedIds] = useState<string[]>([]);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,7 +165,12 @@ function EventRegistrationsContent({
   const handlePromote = async (id: string) => {
     try {
       await promoteFromWaitlist(id);
-      toast({ type: 'success', message: 'Pendaftar dipindahkan dari daftar tunggu ke Menunggu Verifikasi.' });
+      // Their next WhatsApp message should say "a slot opened up"
+      setPromotedIds((prev) => [...prev, id]);
+      toast({
+        type: 'success',
+        message: 'Dipindahkan ke Menunggu Verifikasi. Kirim kabar via tombol WhatsApp pendaftar.',
+      });
       loadData();
     } catch (err: unknown) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal memindahkan pendaftar' });
@@ -441,13 +448,14 @@ function EventRegistrationsContent({
   };
 
   // Generate WhatsApp message to registrant
+  // Message follows the registration state and the event's templates (lib/notifications)
   const generateRegistrantWALink = (reg: Registration) => {
-    const cleanPhone = reg.contact_phone.replace(/[^0-9]/g, '');
-    const targetPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-    const msg = `Halo ${reg.contact_name},\n\nMengenai pendaftaran Anda pada event *${event?.title || 'Event'}* (Kode: *${reg.code}*):\nStatus saat ini: *${
-      reg.status === 'verified' ? 'TERVERIFIKASI' : reg.status === 'pending' ? 'MENUNGGU VERIFIKASI' : 'DITOLAK'
-    }*.\n\n${reg.admin_note ? `Catatan Panitia: "${reg.admin_note}"\n\n` : ''}Terima kasih,\nPanitia Penyelenggara.`;
-    return `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`;
+    if (!event) return '#';
+    return buildParticipantMessage(event, reg, {
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
+      formatMoney: formatRupiah,
+      justPromoted: promotedIds.includes(reg.id),
+    }).link;
   };
 
   if (accessDenied) {

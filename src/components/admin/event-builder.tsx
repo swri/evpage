@@ -12,6 +12,7 @@ import {
 } from '@/types';
 import { BUILT_IN_TEMPLATES } from '@/lib/data-service';
 import { listEventTypes, resolveEventType } from '@/lib/event-types';
+import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib/notifications';
 import { saveEvent, formatRupiah } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
 import { useOrg } from '@/components/admin/org-context';
@@ -122,6 +123,9 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
   const [quotaMode, setQuotaMode] = useState<QuotaMode>(initialEvent?.quota_mode ?? 'registration');
   const [waitlistEnabled, setWaitlistEnabled] = useState<boolean>(initialEvent?.waitlist_enabled ?? false);
   const [eventType, setEventType] = useState<string>(initialEvent?.event_type ?? 'general');
+  const [notificationTemplates, setNotificationTemplates] = useState<Partial<Record<string, string>>>(
+    initialEvent?.notification_templates ?? {}
+  );
   const [groupingEnabled, setGroupingEnabled] = useState<boolean>(
     () => resolveEventType(initialEvent ?? { event_type: 'general' }).grouping.enabled
   );
@@ -366,6 +370,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         organization_id: initialEvent?.organization_id ?? activeOrg?.id,
         form_schema: sanitizedFields,
         wa_template: waTemplate.trim(),
+        // Blank fields fall back to the defaults, so they are not stored
+        notification_templates: Object.fromEntries(
+          Object.entries(notificationTemplates).filter(([, text]) => text && text.trim())
+        ),
         success_message: successMessage.trim(),
       });
 
@@ -1330,6 +1338,33 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
                 Variabel yang tersedia: <code>{'{event}'}</code>, <code>{'{kode}'}</code>, <code>{'{nama}'}</code>, <code>{'{total}'}</code>, <code>{'{bukti}'}</code>
               </p>
             </div>
+
+            {/* Messages organizers send to participants (lib/notifications) */}
+            <details className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+              <summary className="cursor-pointer text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                Template pesan ke peserta (status, daftar tunggu)
+              </summary>
+              <p className="mt-2 text-[11px] text-neutral-500">
+                Kosongkan untuk memakai teks bawaan. Variabel: {TEMPLATE_VARIABLES.map((v) => `{${v}}`).join(', ')}
+              </p>
+              <div className="mt-3 space-y-3">
+                {NOTIFICATION_KINDS.filter((k) => k.kind !== 'registration_received').map(({ kind, label }) => (
+                  <div key={kind}>
+                    <label htmlFor={`tpl-${kind}`} className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block mb-1">
+                      {label}
+                    </label>
+                    <Textarea
+                      id={`tpl-${kind}`}
+                      rows={3}
+                      value={notificationTemplates[kind] ?? ''}
+                      onChange={(e) => setNotificationTemplates((prev) => ({ ...prev, [kind]: e.target.value }))}
+                      placeholder={DEFAULT_TEMPLATES[kind]}
+                      className="text-xs font-mono"
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
 
             <div>
               <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">

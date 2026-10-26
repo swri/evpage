@@ -3,6 +3,7 @@ import { INITIAL_EVENTS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } f
 import { createClient as getSupabaseClient, isSupabaseConfigured } from './supabase/client.ts';
 import { dbError, getStorage, isBrowser, setStorage } from './local-db.ts';
 import { getOrganization } from './orgs.ts';
+import { renderTemplate, whatsAppLink } from './notifications.ts';
 import { DEMO_ORG_ID } from './data-service.ts';
 
 export { formatRupiah, formatIndoDate, isSupabaseConfigured };
@@ -167,6 +168,7 @@ function toEventRow(evt: EventItem) {
     waitlist_enabled: evt.waitlist_enabled ?? false,
     event_type: evt.event_type ?? 'general',
     type_config: evt.type_config ?? {},
+    notification_templates: evt.notification_templates ?? {},
     price_type: evt.price_type,
     price_amount: evt.price_amount,
     prefix_code: evt.prefix_code,
@@ -275,6 +277,7 @@ export async function saveEvent(eventData: Partial<EventItem>): Promise<EventIte
       waitlist_enabled: eventData.waitlist_enabled ?? false,
       event_type: eventData.event_type ?? 'general',
       type_config: eventData.type_config ?? {},
+      notification_templates: eventData.notification_templates ?? {},
       price_type: eventData.price_type || 'fixed',
       price_amount: eventData.price_amount ?? 0,
       prefix_code: (eventData.prefix_code || 'EVT').toUpperCase().slice(0, 5),
@@ -729,18 +732,6 @@ export function buildWhatsAppLink(
     bukti?: string;
   }
 ): string {
-  // Clean phone number (convert 08xx to 628xx)
-  let phone = adminPhone.replace(/[^0-9]/g, '');
-  if (phone.startsWith('0')) {
-    phone = '62' + phone.slice(1);
-  }
-
-  const text = template
-    .replace(/{event}/g, data.event)
-    .replace(/{kode}/g, data.kode)
-    .replace(/{nama}/g, data.nama)
-    .replace(/{total}/g, data.total)
-    .replace(/{bukti}/g, data.bukti || '-');
-
-  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  // Same renderer as lib/notifications (safe against "$&" in names)
+  return whatsAppLink(adminPhone, renderTemplate(template, { ...data, bukti: data.bukti || '-' }));
 }
