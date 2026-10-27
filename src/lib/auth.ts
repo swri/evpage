@@ -304,3 +304,39 @@ export async function logoutAdmin(): Promise<void> {
     localStorage.removeItem(ADMIN_STORAGE_KEY);
   }
 }
+
+/**
+ * Listens for auth state changes from Supabase and cross-tab storage events,
+ * keeping the client admin session in sync. Calls onSignOut when the session ends.
+ */
+export function setupAuthListener(onSignOut?: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const cleanups: (() => void)[] = [];
+
+  // 1. Cross-tab storage synchronization
+  const handleStorage = (e: StorageEvent) => {
+    if (e.key === ADMIN_STORAGE_KEY && !e.newValue) {
+      if (onSignOut) onSignOut();
+    }
+  };
+  window.addEventListener('storage', handleStorage);
+  cleanups.push(() => window.removeEventListener('storage', handleStorage));
+
+  // 2. Supabase auth state synchronization
+  const supabase = createClient();
+  if (supabase) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+        localStorage.removeItem(ADMIN_STORAGE_KEY);
+        if (onSignOut) onSignOut();
+      }
+    });
+    cleanups.push(() => subscription.unsubscribe());
+  }
+
+  return () => {
+    cleanups.forEach((fn) => fn());
+  };
+}
+

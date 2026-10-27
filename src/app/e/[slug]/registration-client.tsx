@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { RegistrationFormSkeleton } from '@/components/ui/skeleton';
-import { PROOF_ACCEPT, storePaymentProof, validateProofFile } from '@/lib/payment-proof';
+import { PROOF_ACCEPT, storePaymentProof, validateProofFile, deletePaymentProof } from '@/lib/payment-proof';
 import { linkifyText, locationHref } from '@/lib/links';
 
 /** Empty answers matching the form schema (repeaters start with their minimum rows). */
@@ -257,6 +257,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
     }
 
     setIsSubmitting(true);
+    let paymentProofPath: string | undefined;
     try {
       // Auto-detect contact info for ticket lookup & WhatsApp notifications
       const phoneField = event.form_schema.find(
@@ -282,7 +283,6 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
       const detectedEmail =
         (emailField && answers[emailField.id] ? String(answers[emailField.id]).trim() : '') || '-';
 
-      let paymentProofPath: string | undefined;
       if (paymentProof && paymentProofFile) {
         setSubmitStep('Mengunggah bukti pembayaran…');
         // Uploaded to private storage in Supabase mode, inline data URL in demo mode
@@ -317,6 +317,9 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: unknown) {
+      if (paymentProofPath) {
+        await deletePaymentProof(paymentProofPath).catch(() => {});
+      }
       const message = err instanceof Error ? err.message : 'Terjadi kesalahan sistem saat menyimpan pendaftaran.';
       toast({
         type: 'error',

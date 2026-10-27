@@ -927,7 +927,9 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
                         variant="ghost"
                         onClick={() => {
                           const currentSub = selectedField.subFields || [];
-                          const newSubId = 'col_' + Math.random().toString(36).substring(2, 6);
+                          const newSubId = 'col_' + (typeof crypto !== 'undefined' && crypto.randomUUID
+                            ? crypto.randomUUID().replace(/-/g, '').substring(0, 12)
+                            : Math.random().toString(36).substring(2, 14));
                           updateSelectedField({
                             subFields: [
                               ...currentSub,

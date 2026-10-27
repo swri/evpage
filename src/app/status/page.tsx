@@ -62,10 +62,13 @@ function StatusContent() {
     handleSearch(code, phone);
   };
 
-  const waNumber = orgSettings?.wa_number || '6281234567890';
-  const waContactUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(
-    `Halo Panitia, saya ingin menanyakan status pendaftaran dengan Kode: ${code || '-'}`
-  )}`;
+  const rawWa = orgSettings?.wa_number?.trim();
+  const cleanWa = rawWa ? rawWa.replace(/[^0-9]/g, '') : '';
+  const waContactUrl = cleanWa
+    ? `https://wa.me/${cleanWa}?text=${encodeURIComponent(
+        `Halo Panitia, saya ingin menanyakan status pendaftaran dengan Kode: ${code || '-'}`
+      )}`
+    : null;
 
   return (
     <div className="space-y-6">
@@ -221,17 +224,23 @@ function StatusContent() {
                 </div>
               )}
 
-              {/* WA Help Button */}
+              {/* WA Help Button / Contact Alternative */}
               <div className="pt-2">
-                <a
-                  href={waContactUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 transition-colors"
-                >
-                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Ada kendala? Hubungi Panitia via WhatsApp</span>
-                </a>
+                {waContactUrl ? (
+                  <a
+                    href={waContactUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 transition-colors"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Ada kendala? Hubungi Panitia via WhatsApp</span>
+                  </a>
+                ) : (
+                  <div className="rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 text-center text-xs text-neutral-600 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-400">
+                    Ada kendala dengan pendaftaran Anda? Silakan hubungi panitia penyelenggara melalui kanal resmi acara.
+                  </div>
+                )}
               </div>
             </div>
           ) : (

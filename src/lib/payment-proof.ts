@@ -78,3 +78,18 @@ export async function resolvePaymentProofUrl(stored: string | undefined | null):
 export function inlineProofUrl(stored: string | undefined | null): string | null {
   return stored && SAFE_DATA_URL.test(stored) ? stored : null;
 }
+
+/**
+ * Removes an uploaded payment proof file from storage (used to rollback if registration creation fails).
+ */
+export async function deletePaymentProof(path: string | undefined | null): Promise<void> {
+  if (!path || path.startsWith('data:')) return;
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  try {
+    await supabase.storage.from(PROOF_BUCKET).remove([path]);
+  } catch (err) {
+    console.warn('Gagal menghapus bukti pembayaran yatim:', err);
+  }
+}
+

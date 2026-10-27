@@ -41,8 +41,7 @@ import {
   UserCheck,
   HardDrive,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { sanitizeCsvRow } from '@/lib/export';
+import { sanitizeCsvRow, downloadCsv, downloadExcel } from '@/lib/export';
 import { useOrg } from '@/components/admin/org-context';
 import { PaymentProofPreview, PaymentProofThumb } from '@/components/admin/payment-proof-preview';
 import { resolveEventType } from '@/lib/event-types';
@@ -384,12 +383,8 @@ function EventRegistrationsContent({
       return baseRow;
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pendaftar');
-
     const fileName = `${event?.slug || 'event'}-pendaftar-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    await downloadExcel(fileName, rows, 'Pendaftar');
 
     toast({
       type: 'success',
@@ -416,17 +411,8 @@ function EventRegistrationsContent({
       'Tanggal': r.created_at,
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
-
-    const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${event?.slug || 'event'}-pendaftar.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fileName = `${event?.slug || 'event'}-pendaftar.csv`;
+    downloadCsv(fileName, rows);
 
     toast({
       type: 'success',

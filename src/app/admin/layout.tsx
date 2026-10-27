@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { getCurrentAdminSession, logoutAdmin } from '@/lib/auth';
+import { getCurrentAdminSession, logoutAdmin, setupAuthListener } from '@/lib/auth';
 import { OrgProvider, useOrg } from '@/components/admin/org-context';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
@@ -52,6 +52,15 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     setAuthChecked(true);
+
+    const unsubscribe = setupAuthListener(() => {
+      startNavigationProgress();
+      router.push('/admin/login');
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [pathname, isAuthPage, router]);
 
   // If on auth pages (login / register), render children without sidebar
