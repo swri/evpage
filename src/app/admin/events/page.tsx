@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getAllEvents, duplicateEvent, formatRupiah } from '@/lib/store';
+import { getAllEvents, duplicateEvent } from '@/lib/store';
+import { formatRupiah } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { deleteEventWithFiles } from '@/lib/cleanup';
 import { refreshPublicPages } from '@/lib/public-refresh';
 import { useOrg } from '@/components/admin/org-context';
@@ -35,7 +37,7 @@ export default function AdminEventsPage() {
       const evts = await getAllEvents();
       setAllEvents(evts);
     } catch (err) {
-      console.error('Failed to load events:', err);
+      logger.error('admin-events', 'Failed to load events:', err);
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getAllEvents, getAllRegistrations, formatRupiah, formatIndoDate } from '@/lib/store';
+import { getAllEvents, getAllRegistrations } from '@/lib/store';
+import { formatRupiah, formatIndoDate } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { useOrg } from '@/components/admin/org-context';
 import { EventItem, Registration } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -38,7 +40,7 @@ export default function AdminDashboardPage() {
         setAllEvents(evts);
         setAllRegistrations(regs);
       } catch (err) {
-        console.error('Failed loading dashboard stats:', err);
+        logger.error('admin', 'Failed loading dashboard stats:', err);
       } finally {
         setLoading(false);
       }

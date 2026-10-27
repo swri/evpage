@@ -2,6 +2,8 @@
 //  - demo mode: browser localStorage (in-memory under Node, e.g. in tests)
 //  - Supabase mode: error helper so DB failures always reach the caller
 
+import { logger } from './logger.ts';
+
 export const isBrowser = typeof window !== 'undefined';
 
 export function getStorage<T>(key: string, defaultValue: T): T {
@@ -34,7 +36,7 @@ export function setStorage<T>(key: string, value: T): boolean {
 // When Supabase is configured the database is the only source of truth.
 // Demo data must never leak into that mode (fake bank accounts, fake events).
 export function dbError(context: string, error: { message?: string } | null): Error {
-  console.error(`Supabase ${context} error:`, error);
+  logger.error('db', `Supabase ${context} error:`, error);
   return new Error(error?.message || `Gagal ${context}`);
 }
 

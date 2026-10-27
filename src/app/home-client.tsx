@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getAllEvents, getOrganizationSettings, formatRupiah, formatIndoDate, remainingSlots } from '@/lib/store';
+import { getAllEvents, getOrganizationSettings, remainingSlots } from '@/lib/store';
+import { formatRupiah, formatIndoDate } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { EventItem, OrganizationSettings } from '@/types';
 import {
   Calendar,
@@ -64,7 +66,7 @@ export function HomeClient({
         setEvents(evts);
         setSettings(orgSettings);
       } catch (err) {
-        console.error('Error loading data:', err);
+        logger.error('home', 'Error loading data:', err);
       } finally {
         setLoading(false);
       }

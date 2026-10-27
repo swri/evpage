@@ -1,5 +1,7 @@
 import type { EventItem, OrganizationSettings, Registration, RegistrationStatus, RegistrationStatusResult } from '../types/index.ts';
-import { INITIAL_EVENTS, INITIAL_REGISTRATIONS, formatRupiah, formatIndoDate } from './data-service.ts';
+import { INITIAL_EVENTS, INITIAL_REGISTRATIONS } from './data-service.ts';
+import { formatRupiah, formatIndoDate } from './utils.ts';
+import { logger } from './logger.ts';
 import { createClient as getSupabaseClient, isSupabaseConfigured } from './supabase/client.ts';
 import { dbError, getStorage, isBrowser, setStorage } from './local-db.ts';
 import { getOrganization } from './orgs.ts';
@@ -46,7 +48,7 @@ export async function getOrganizationSettings(organizationId?: string): Promise<
     return org || EMPTY_ORGANIZATION_SETTINGS;
   } catch (err) {
     // Non-fatal for page rendering, but never fall back to demo payment details
-    console.error('getOrganizationSettings error:', err);
+    logger.error('store', 'getOrganizationSettings error', err);
     return EMPTY_ORGANIZATION_SETTINGS;
   }
 }

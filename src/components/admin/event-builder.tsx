@@ -11,86 +11,33 @@ import {
   QuotaMode,
 } from '@/types';
 import { BUILT_IN_TEMPLATES } from '@/lib/data-service';
-import { listEventTypes, resolveEventType } from '@/lib/event-types';
+import { resolveEventType } from '@/lib/event-types';
 import { refreshPublicPages } from '@/lib/public-refresh';
-import { isHttpUrl } from '@/lib/links';
-import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib/notifications';
-import { saveEvent, formatRupiah } from '@/lib/store';
+import { saveEvent } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
 import { useOrg } from '@/components/admin/org-context';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast-context';
-import { DynamicFormField } from '@/components/form/dynamic-form-field';
-import { ImageUploadField } from '@/components/ui/image-upload-field';
 import {
   Save,
   ArrowLeft,
-  Plus,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  GripVertical,
-  Eye,
-  Copy,
-  DollarSign,
-  FileText,
   Sliders,
+  FileText,
+  Eye,
   ExternalLink,
 } from 'lucide-react';
 
-interface EventBuilderProps {
+import { DEFAULT_INITIAL_FIELDS } from './event-builder/constants';
+import { FieldsList } from './event-builder/fields-list';
+import { FieldInspector } from './event-builder/field-inspector';
+import { SettingsTab } from './event-builder/settings-tab';
+import { PreviewTab } from './event-builder/preview-tab';
+
+export interface EventBuilderProps {
   initialEvent?: Partial<EventItem>;
   isEdit?: boolean;
 }
-
-const FIELD_TYPE_OPTIONS: { label: string; value: FieldType; desc: string }[] = [
-  { label: 'Teks Pendek', value: 'text', desc: 'Satu baris teks (nama, nama tim, instansi)' },
-  { label: 'Teks Panjang', value: 'textarea', desc: 'Paragraf catatan, alamat, deskripsi' },
-  { label: 'Angka (Number)', value: 'number', desc: 'Usia, nomor punggung, kuantitas' },
-  { label: 'Email', value: 'email', desc: 'Email dengan validasi format' },
-  { label: 'Nomor WhatsApp / HP', value: 'phone', desc: 'Nomor telepon format kontak' },
-  { label: 'Tanggal', value: 'date', desc: 'Pemilih tanggal lahir / jadwal' },
-  { label: 'Dropdown (Select)', value: 'select', desc: 'Pilihan menu dropdown tunggal' },
-  { label: 'Pilihan Tunggal (Radio)', value: 'radio', desc: 'Opsi radio button berdampingan' },
-  { label: 'Pilihan Ganda (Checkbox)', value: 'checkbox', desc: 'Persetujuan syarat & ketentuan / multi-pilih' },
-  { label: 'Upload Berkas (File)', value: 'file', desc: 'Unggah KTP, kartu pelajar, atau karya' },
-  { label: 'Repeater / Grup Berulang', value: 'repeater', desc: 'Daftar dinamis (pemain tim: nama, no punggung, posisi)' },
-];
-
-const DEFAULT_INITIAL_FIELDS: FormField[] = [
-  {
-    id: 'full_name',
-    type: 'text',
-    label: 'Nama Lengkap',
-    placeholder: 'Contoh: Budi Pratama',
-    validation: { required: true },
-  },
-  {
-    id: 'whatsapp',
-    type: 'phone',
-    label: 'Nomor WhatsApp',
-    placeholder: '0812xxxxxxxx',
-    helperText: 'Digunakan untuk konfirmasi pendaftaran & login cek status tiket',
-    validation: { required: true },
-  },
-  {
-    id: 'email',
-    type: 'email',
-    label: 'Email',
-    placeholder: 'nama@email.com',
-    validation: { required: false },
-  },
-  {
-    id: 'team_name',
-    type: 'text',
-    label: 'Nama Tim / Klub',
-    placeholder: 'Contoh: Garuda Muda FC',
-    validation: { required: true },
-  },
-];
 
 export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps) {
   const { toast } = useToast();
@@ -203,99 +150,90 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         setSelectedFieldIndex(0);
       }
       toast({
-        type: 'success',
-        message: `Template "${tpl.name}" berhasil diterapkan!`,
+        type: 'info',
+        title: 'Template Diterapkan',
+        message: `Template "${tpl.name}" berhasil dimuat ke editor.`,
       });
     }
   };
 
-  // Field Management
-  const addField = (type: FieldType = 'text') => {
-    const newId = 'field_' + Math.random().toString(36).substring(2, 8);
+  // Form Field Actions
+  const addField = (type: FieldType) => {
     const defaultLabels: Record<FieldType, string> = {
-      text: 'Pertanyaan Teks Baru',
-      textarea: 'Catatan / Alamat Lengkap',
-      number: 'Nomor / Jumlah',
+      text: 'Field Teks Baru',
+      textarea: 'Catatan / Alamat Tambahan',
+      number: 'Kuantitas / Usia',
       email: 'Alamat Email',
       phone: 'Nomor WhatsApp / HP',
-      date: 'Pilih Tanggal',
+      date: 'Tanggal Lahir / Jadwal',
       select: 'Pilihan Menu Dropdown',
       radio: 'Pilihan Radio Tunggal',
-      checkbox: 'Pernyataan / Centang',
-      file: 'Unggah Berkas / Dokumen',
+      checkbox: 'Persetujuan Syarat & Ketentuan',
+      file: 'Upload Berkas Pendukung',
       repeater: 'Daftar Anggota / Pemain',
-    };
-    const defaultPlaceholders: Partial<Record<FieldType, string>> = {
-      text: 'Tuliskan isian Anda...',
-      textarea: 'Tuliskan keterangan detail di sini...',
-      number: '0',
-      email: 'nama@email.com',
-      phone: '0812xxxxxxxx',
-      select: 'Pilih salah satu...',
     };
 
     const newField: FormField = {
-      id: newId,
+      id: `field_${Math.random().toString(36).substring(2, 7)}`,
       type,
-      label: defaultLabels[type] || `Field Baru (${type})`,
-      placeholder: defaultPlaceholders[type] || '',
+      label: defaultLabels[type] || 'Field Baru',
+      placeholder: '',
       validation: { required: false },
       options:
         type === 'select' || type === 'radio' || type === 'checkbox'
           ? [
-            { label: 'Opsi 1', value: 'opsi_1' },
-            { label: 'Opsi 2', value: 'opsi_2' },
-          ]
+              { label: 'Opsi 1', value: 'opsi_1' },
+              { label: 'Opsi 2', value: 'opsi_2' },
+            ]
           : undefined,
       subFields:
         type === 'repeater'
           ? [
-            { id: 'sub_1', type: 'text', label: 'Nama', validation: { required: true } },
-            { id: 'sub_2', type: 'number', label: 'Nomor', validation: { required: true } },
-          ]
+              { id: 'sub_name', type: 'text', label: 'Nama Lengkap', validation: { required: true } },
+              { id: 'sub_number', type: 'number', label: 'No Punggung', validation: { required: false } },
+              { id: 'sub_position', type: 'text', label: 'Posisi Bermain', validation: { required: false } },
+            ]
           : undefined,
     };
+
     const nextFields = [...fields, newField];
     setFields(nextFields);
     setSelectedFieldIndex(nextFields.length - 1);
   };
 
-  const removeField = (indexToRemove: number) => {
+  const removeField = (index: number) => {
     if (fields.length <= 1) {
-      toast({ type: 'info', message: 'Minimal harus ada 1 field dalam formulir.' });
+      toast({ type: 'error', message: 'Formulir minimal harus memiliki 1 field.' });
       return;
     }
-    const nextFields = fields.filter((_, idx) => idx !== indexToRemove);
-    setFields(nextFields);
-    if (selectedFieldIndex >= nextFields.length) {
-      setSelectedFieldIndex(Math.max(0, nextFields.length - 1));
+    const next = fields.filter((_, i) => i !== index);
+    setFields(next);
+    if (selectedFieldIndex >= next.length) {
+      setSelectedFieldIndex(Math.max(0, next.length - 1));
     }
   };
 
-  const duplicateField = (indexToDup: number) => {
-    const target = fields[indexToDup];
-    if (!target) return;
-    const newId = (target.id ? `${target.id}_copy` : 'field') + '_' + Math.random().toString(36).substring(2, 6);
+  const duplicateField = (index: number) => {
+    const original = fields[index];
+    if (!original) return;
     const duplicated: FormField = {
-      ...JSON.parse(JSON.stringify(target)),
-      id: newId,
-      label: `${target.label} (Salinan)`,
+      ...JSON.parse(JSON.stringify(original)),
+      id: `${original.id}_copy_${Math.random().toString(36).substring(2, 5)}`,
+      label: `${original.label} (Salinan)`,
     };
-    const nextFields = [...fields];
-    nextFields.splice(indexToDup + 1, 0, duplicated);
-    setFields(nextFields);
-    setSelectedFieldIndex(indexToDup + 1);
-    toast({ type: 'success', message: `Field "${target.label}" berhasil disalin.` });
+    const next = [...fields];
+    next.splice(index + 1, 0, duplicated);
+    setFields(next);
+    setSelectedFieldIndex(index + 1);
   };
 
   const moveField = (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= fields.length) return;
-    const nextFields = [...fields];
-    const temp = nextFields[index];
-    nextFields[index] = nextFields[targetIndex];
-    nextFields[targetIndex] = temp;
-    setFields(nextFields);
+    const next = [...fields];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    setFields(next);
     if (selectedFieldIndex === index) {
       setSelectedFieldIndex(targetIndex);
     } else if (selectedFieldIndex === targetIndex) {
@@ -356,7 +294,6 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         quota_mode: quotaMode,
         waitlist_enabled: waitlistEnabled,
         event_type: eventType,
-        // Keep other per-event overrides; only the grouping switch is edited here
         type_config: {
           ...(initialEvent?.type_config ?? {}),
           grouping: {
@@ -369,13 +306,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         prefix_code: prefixCode.trim().toUpperCase(),
         status,
         organizer_name: organizerName.trim() || 'Panitia Resmi',
-        // Editing must not transfer ownership to whoever saves (e.g. super admin)
         created_by: initialEvent?.created_by ?? currentSession?.user?.id,
-        // New events belong to the organization selected in the sidebar
         organization_id: initialEvent?.organization_id ?? activeOrg?.id,
         form_schema: sanitizedFields,
         wa_template: waTemplate.trim(),
-        // Blank fields fall back to the defaults, so they are not stored
         notification_templates: Object.fromEntries(
           Object.entries(notificationTemplates).filter(([, text]) => text && text.trim())
         ),
@@ -383,7 +317,6 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
       });
 
       setEventId(saved.id);
-      // Public page and its link preview show the change right away (old slug too, if renamed)
       refreshPublicPages(initialEvent?.slug, saved.slug);
 
       toast({
@@ -392,7 +325,6 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         message: `Event "${saved.title}" berhasil disimpan. Anda tetap berada di halaman editor.`,
       });
 
-      // Update URL silently without full navigation if we just created a new event
       if (!isEdit && typeof window !== 'undefined' && window.location.pathname.includes('/new')) {
         window.history.replaceState(null, '', `/admin/events/${saved.id}/edit`);
       }
@@ -408,7 +340,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
     }
   };
 
-  const selectedField = fields[selectedFieldIndex] || fields[0] || null;
+  const selectedField = fields[selectedFieldIndex] || fields[0] || undefined;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -428,77 +360,81 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 truncate max-w-md">
               {title || 'Event Baru Tanpa Judul'}
             </h1>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant={status === 'open' ? 'success' : 'outline'} className="capitalize text-[10px]">
+                {status}
+              </Badge>
+              {slug && (
+                <Link
+                  href={`/e/${slug}`}
+                  target="_blank"
+                  className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200"
+                >
+                  <span>evpage/e/{slug}</span>
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Action Buttons & Templates Dropdown */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Template Selector */}
-          <div className="relative">
-            <select
-              onChange={(e) => {
-                if (e.target.value) applyTemplate(e.target.value);
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          {/* Preset Template Switcher */}
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value) {
+                applyTemplate(e.target.value);
                 e.target.value = '';
-              }}
-              defaultValue=""
-              className="flex h-9 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-700 shadow-2xs dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 cursor-pointer"
-            >
-              <option value="" disabled>
-                ✨ Muat Template Bawaan...
+              }
+            }}
+            className="text-xs h-9 px-2.5 rounded-lg border border-neutral-300 bg-white text-neutral-700 hover:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 font-medium cursor-pointer"
+          >
+            <option value="" disabled>
+              Muat Template Bawaan...
+            </option>
+            {BUILT_IN_TEMPLATES.map((tpl) => (
+              <option key={tpl.id} value={tpl.id}>
+                {tpl.name}
               </option>
-              {BUILT_IN_TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {slug && (
-            <a
-              href={`/e/${slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 h-9 rounded-lg border border-neutral-300 bg-white px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 transition-colors shadow-2xs"
-              title="Buka form pendaftaran publik di tab baru"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span>Lihat Form Publik</span>
-            </a>
-          )}
+            ))}
+          </select>
 
           <Button
             onClick={handleSave}
-            isLoading={isSaving}
-            className="h-9 text-xs font-semibold gap-1.5 shadow-xs"
+            disabled={isSaving}
+            className="gap-2 shadow-xs h-9 px-4 text-xs font-semibold"
           >
-            <Save className="h-3.5 w-3.5" />
-            <span>Simpan Event</span>
+            <Save className="h-4 w-4" />
+            <span>{isSaving ? 'Menyimpan...' : 'Simpan Event'}</span>
           </Button>
         </div>
       </div>
 
-      {/* Tabs Switcher */}
-      <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-800">
+      {/* Tabs Header */}
+      <div className="flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-800">
         <button
           type="button"
           onClick={() => setActiveTab('editor')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'editor'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+            activeTab === 'editor'
               ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
               : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300'
-            }`}
+          }`}
         >
           <Sliders className="h-4 w-4" />
-          <span>Editor Formulir ({fields.length} Field)</span>
+          <span>Editor Form Pendaftaran</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'settings'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+            activeTab === 'settings'
               ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
               : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300'
-            }`}
+          }`}
         >
           <FileText className="h-4 w-4" />
           <span>Pengaturan Event & Harga</span>
@@ -507,10 +443,11 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         <button
           type="button"
           onClick={() => setActiveTab('preview')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'preview'
+          className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+            activeTab === 'preview'
               ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
               : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300'
-            }`}
+          }`}
         >
           <Eye className="h-4 w-4" />
           <span>Pratinjau Live Form</span>
@@ -520,957 +457,86 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
       {/* TAB 1: UNIFIED FORM BUILDER EDITOR */}
       {activeTab === 'editor' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in">
-          {/* Left Column: All Fields List & Reordering */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="flex items-center justify-between px-0.5">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-200">
-                  Daftar Field Formulir ({fields.length})
-                </span>
-                <p className="text-[11px] text-neutral-400">
-                  Semua field dapat diedit, dipindah, atau dihapus
-                </p>
-              </div>
+          <FieldsList
+            fields={fields}
+            selectedFieldIndex={selectedFieldIndex}
+            setSelectedFieldIndex={setSelectedFieldIndex}
+            addField={addField}
+            moveField={moveField}
+            duplicateField={duplicateField}
+            removeField={removeField}
+          />
 
-              <Button
-                size="sm"
-                onClick={() => addField('text')}
-                className="h-8 text-xs gap-1.5 shadow-xs"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Tambah Field</span>
-              </Button>
-            </div>
-
-            {/* Quick Type Pills */}
-            <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl border border-neutral-200/80 bg-neutral-50/70 dark:border-neutral-800 dark:bg-neutral-900/50">
-              <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider px-1">
-                + Cepat:
-              </span>
-              {[
-                { label: 'Teks', type: 'text' as FieldType },
-                { label: 'WhatsApp', type: 'phone' as FieldType },
-                { label: 'Email', type: 'email' as FieldType },
-                { label: 'Angka', type: 'number' as FieldType },
-                { label: 'Pilihan', type: 'select' as FieldType },
-                { label: 'Upload', type: 'file' as FieldType },
-                { label: 'Repeater', type: 'repeater' as FieldType },
-              ].map((pt) => (
-                <button
-                  key={pt.type}
-                  type="button"
-                  onClick={() => addField(pt.type)}
-                  className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-white border border-neutral-200 hover:border-neutral-900 text-neutral-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-400 transition-colors"
-                >
-                  +{pt.label}
-                </button>
-              ))}
-            </div>
-
-            {/* The Unified Fields List */}
-            <div className="space-y-2">
-              {fields.map((f, index) => {
-                const isSelected = index === selectedFieldIndex;
-                return (
-                  <div
-                    key={`field_${index}_${f.id || 'id'}`}
-                    onClick={() => setSelectedFieldIndex(index)}
-                    className={`group flex items-center justify-between rounded-xl border p-3 transition-all cursor-pointer ${isSelected
-                        ? 'border-neutral-900 bg-white shadow-xs ring-1 ring-neutral-900/10 dark:border-neutral-100 dark:bg-neutral-800 dark:ring-neutral-100/10'
-                        : 'border-neutral-200 bg-white/70 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="text-neutral-300 group-hover:text-neutral-500 cursor-grab">
-                        <GripVertical className="h-4 w-4" />
-                      </div>
-                      <div className="overflow-hidden">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 truncate">
-                            {f.label}
-                          </span>
-                          {f.validation?.required ? (
-                            <span className="text-[10px] text-red-500 font-bold">*Wajib</span>
-                          ) : (
-                            <span className="text-[10px] text-neutral-400 font-medium">Opsional</span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-neutral-400 capitalize">
-                          {f.type === 'repeater' ? 'Repeater (Grup Berulang)' : f.type}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveField(index, 'up');
-                        }}
-                        disabled={index === 0}
-                        title="Geser Naik"
-                        className="p-1 rounded text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-20"
-                      >
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveField(index, 'down');
-                        }}
-                        disabled={index === fields.length - 1}
-                        title="Geser Turun"
-                        className="p-1 rounded text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 disabled:opacity-20"
-                      >
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          duplicateField(index);
-                        }}
-                        title="Salin Field"
-                        className="p-1 rounded text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 ml-0.5"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeField(index);
-                        }}
-                        title="Hapus Field"
-                        className="p-1 rounded text-neutral-400 hover:text-red-600 ml-0.5"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right Column: Full Inspector for Selected Field */}
-          <div className="lg:col-span-7">
-            {selectedField ? (
-              <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 space-y-5 animate-in fade-in duration-200">
-                <div className="border-b border-neutral-200 pb-3 dark:border-neutral-800 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                      Pengaturan Field: {selectedField.label}
-                    </h3>
-                    <p className="text-[11px] text-neutral-400">Tipe: <span className="capitalize font-medium text-neutral-600 dark:text-neutral-300">{selectedField.type}</span></p>
-                  </div>
-                  <Badge variant="outline" className="capitalize text-[10px]">
-                    {selectedField.type}
-                  </Badge>
-                </div>
-
-                {/* Field ID / Key */}
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                    ID / Kunci Kolom (Identifier)
-                  </label>
-                  <Input
-                    type="text"
-                    value={selectedField.id}
-                    onChange={(e) => {
-                      const cleanId = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-                      updateSelectedField({ id: cleanId });
-                    }}
-                    onBlur={() => {
-                      if (!selectedField.id.trim()) {
-                        const fallback = selectedField.label
-                          ? selectedField.label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').slice(0, 20)
-                          : '';
-                        updateSelectedField({ id: fallback || 'field_' + Math.random().toString(36).substring(2, 7) });
-                      }
-                    }}
-                    placeholder="contoh: nama_lengkap, nomor_wa, tim"
-                    className="text-xs h-9 font-mono"
-                  />
-                  <p className="text-[10px] text-neutral-400 mt-0.5">
-                    Nama kunci kolom di tabel data pendaftaran (huruf kecil & underscore). Bebas dihapus & diganti.
-                  </p>
-                </div>
-
-                {/* Field Type Selector */}
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                    Tipe Field
-                  </label>
-                  <select
-                    value={selectedField.type}
-                    onChange={(e) => {
-                      const newType = e.target.value as FieldType;
-                      updateSelectedField({
-                        type: newType,
-                        options:
-                          newType === 'select' || newType === 'radio' || newType === 'checkbox'
-                            ? selectedField.options || [
-                              { label: 'Opsi 1', value: 'opsi_1' },
-                              { label: 'Opsi 2', value: 'opsi_2' },
-                            ]
-                            : undefined,
-                        subFields:
-                          newType === 'repeater'
-                            ? selectedField.subFields || [
-                              { id: 'sf_1', type: 'text', label: 'Nama', validation: { required: true } },
-                            ]
-                            : undefined,
-                      });
-                    }}
-                    className="flex h-9 w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                  >
-                    {FIELD_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label} — {opt.desc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Label Field */}
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                    Label Pertanyaan / Field <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="text"
-                    value={selectedField.label}
-                    onChange={(e) => updateSelectedField({ label: e.target.value })}
-                    placeholder="Contoh: Nama Lengkap, Nomor WhatsApp, dll."
-                    className="text-xs h-9"
-                    required
-                  />
-                </div>
-
-                {/* Placeholder Field */}
-                {selectedField.type !== 'checkbox' && selectedField.type !== 'file' && (
-                  <div>
-                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                      Placeholder (Contoh Teks di Dalam Input)
-                    </label>
-                    <Input
-                      type="text"
-                      value={selectedField.placeholder || ''}
-                      onChange={(e) => updateSelectedField({ placeholder: e.target.value })}
-                      placeholder="Contoh: Masukkan nama lengkap Anda..."
-                      className="text-xs h-9"
-                    />
-                  </div>
-                )}
-
-                {/* Helper Text */}
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                    Petunjuk Pengisian (Helper Text di Bawah Input)
-                  </label>
-                  <Input
-                    type="text"
-                    value={selectedField.helperText || ''}
-                    onChange={(e) => updateSelectedField({ helperText: e.target.value })}
-                    placeholder="Contoh: Pastikan nomor aktif di WhatsApp untuk verifikasi tiket."
-                    className="text-xs h-9"
-                  />
-                </div>
-
-                {/* Validation Rules */}
-                <div className="space-y-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-                  <div className="text-xs font-semibold uppercase text-neutral-400">
-                    Aturan Validasi
-                  </div>
-
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={!!selectedField.validation?.required}
-                      onChange={(e) =>
-                        updateSelectedField({
-                          validation: { ...selectedField.validation, required: e.target.checked },
-                        })
-                      }
-                      className="h-4 w-4 rounded-sm text-neutral-900 border-neutral-300"
-                    />
-                    <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
-                      Wajib Diisi oleh Pendaftar (Required)
-                    </span>
-                  </label>
-
-                  {/* Min / Max for Repeater or Number */}
-                  {(selectedField.type === 'number' || selectedField.type === 'repeater') && (
-                    <div className="grid grid-cols-2 gap-4 pt-1">
-                      <div>
-                        <label className="text-xs text-neutral-500 block mb-1">
-                          {selectedField.type === 'repeater' ? 'Min. Baris Peserta' : 'Nilai Minimal'}
-                        </label>
-                        <Input
-                          type="number"
-                          value={selectedField.validation?.min ?? ''}
-                          onChange={(e) =>
-                            updateSelectedField({
-                              validation: {
-                                ...selectedField.validation,
-                                min: e.target.value === '' ? undefined : Number(e.target.value),
-                              },
-                            })
-                          }
-                          className="text-xs h-8"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-neutral-500 block mb-1">
-                          {selectedField.type === 'repeater' ? 'Maks. Baris Peserta' : 'Nilai Maksimal'}
-                        </label>
-                        <Input
-                          type="number"
-                          value={selectedField.validation?.max ?? ''}
-                          onChange={(e) =>
-                            updateSelectedField({
-                              validation: {
-                                ...selectedField.validation,
-                                max: e.target.value === '' ? undefined : Number(e.target.value),
-                              },
-                            })
-                          }
-                          className="text-xs h-8"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Options Manager (for select, radio, checkbox) */}
-                {(selectedField.type === 'select' ||
-                  selectedField.type === 'radio' ||
-                  selectedField.type === 'checkbox') && (
-                    <div className="border-t border-neutral-100 pt-3 dark:border-neutral-800 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase text-neutral-400">
-                          Daftar Opsi Pilihan
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            const currentOpts = selectedField.options || [];
-                            const idx = currentOpts.length + 1;
-                            updateSelectedField({
-                              options: [
-                                ...currentOpts,
-                                { label: `Opsi ${idx}`, value: `opsi_${idx}` },
-                              ],
-                            });
-                          }}
-                          className="h-7 text-xs"
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Tambah Opsi
-                        </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {selectedField.options?.map((opt, optIdx) => (
-                          <div key={optIdx} className="flex items-center gap-2">
-                            <Input
-                              value={opt.label}
-                              onChange={(e) => {
-                                const updated = [...(selectedField.options || [])];
-                                updated[optIdx] = {
-                                  ...updated[optIdx],
-                                  label: e.target.value,
-                                  value: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
-                                };
-                                updateSelectedField({ options: updated });
-                              }}
-                              placeholder={`Label Opsi #${optIdx + 1}`}
-                              className="text-xs h-8 flex-1"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = (selectedField.options || []).filter(
-                                  (_, idx) => idx !== optIdx
-                                );
-                                updateSelectedField({ options: updated });
-                              }}
-                              disabled={(selectedField.options || []).length <= 1}
-                              className="p-1.5 text-neutral-400 hover:text-red-500 disabled:opacity-20"
-                              title="Hapus Opsi"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                {/* Subfields Manager for Repeater */}
-                {selectedField.type === 'repeater' && (
-                  <div className="border-t border-neutral-100 pt-3 dark:border-neutral-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold uppercase text-neutral-400">
-                          Kolom Sub-Fields Repeater
-                        </span>
-                        <p className="text-[11px] text-neutral-400">
-                          Kolom yang diisi pada setiap baris peserta (contoh: Nama, No. Punggung, Posisi)
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          const currentSub = selectedField.subFields || [];
-                          const newSubId = 'col_' + (typeof crypto !== 'undefined' && crypto.randomUUID
-                            ? crypto.randomUUID().replace(/-/g, '').substring(0, 12)
-                            : Math.random().toString(36).substring(2, 14));
-                          updateSelectedField({
-                            subFields: [
-                              ...currentSub,
-                              {
-                                id: newSubId,
-                                type: 'text',
-                                label: `Kolom ${currentSub.length + 1}`,
-                                validation: { required: true },
-                              },
-                            ],
-                          });
-                        }}
-                        className="h-7 text-xs"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Tambah Kolom
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {selectedField.subFields?.map((sf, sfIdx) => (
-                        <div
-                          key={sf.id}
-                          className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-800/40 space-y-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
-                              Kolom #{sfIdx + 1}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = (selectedField.subFields || []).filter(
-                                  (_, idx) => idx !== sfIdx
-                                );
-                                updateSelectedField({ subFields: updated });
-                              }}
-                              disabled={(selectedField.subFields || []).length <= 1}
-                              className="text-neutral-400 hover:text-red-500 disabled:opacity-20 p-1"
-                              title="Hapus Kolom"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[10px] text-neutral-400 block mb-1">
-                                Label Kolom
-                              </label>
-                              <Input
-                                value={sf.label}
-                                onChange={(e) => {
-                                  const updated = [...(selectedField.subFields || [])];
-                                  updated[sfIdx] = { ...updated[sfIdx], label: e.target.value };
-                                  updateSelectedField({ subFields: updated });
-                                }}
-                                className="text-xs h-7"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[10px] text-neutral-400 block mb-1">
-                                Tipe Input
-                              </label>
-                              <select
-                                value={sf.type}
-                                onChange={(e) => {
-                                  const updated = [...(selectedField.subFields || [])];
-                                  updated[sfIdx] = {
-                                    ...updated[sfIdx],
-                                    type: e.target.value as FieldType,
-                                  };
-                                  updateSelectedField({ subFields: updated });
-                                }}
-                                className="flex h-7 w-full rounded border border-neutral-300 bg-white px-2 text-[11px] dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                              >
-                                <option value="text">Teks</option>
-                                <option value="number">Angka</option>
-                                <option value="phone">Nomor HP</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Footer for this Field */}
-                <div className="border-t border-neutral-100 pt-4 flex items-center justify-between dark:border-neutral-800">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => duplicateField(selectedFieldIndex)}
-                    className="h-8 text-xs gap-1.5"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Salin Field Ini</span>
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeField(selectedFieldIndex)}
-                    className="h-8 text-xs gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Hapus Field</span>
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-neutral-300 p-12 text-center text-xs text-neutral-400 dark:border-neutral-700">
-                Pilih salah satu field di sebelah kiri untuk mengedit pengaturannya, atau klik <strong>Tambah Field</strong>.
-              </div>
-            )}
-          </div>
+          <FieldInspector
+            selectedField={selectedField}
+            selectedFieldIndex={selectedFieldIndex}
+            updateSelectedField={updateSelectedField}
+            duplicateField={duplicateField}
+            removeField={removeField}
+          />
         </div>
       )}
 
       {/* TAB 2: EVENT SETTINGS & PRICING */}
       {activeTab === 'settings' && (
-        <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 space-y-6 animate-in fade-in">
-          <div className="border-b border-neutral-200 pb-3 dark:border-neutral-800">
-            <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
-              Informasi Umum & Konfigurasi Event
-            </h3>
-            <p className="text-xs text-neutral-500">
-              Sesuaikan URL, status publik, lokasi, kuota, serta biaya registrasi.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Title */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Judul Event <span className="text-red-500">*</span>
-              </label>
-              <Input
-                type="text"
-                value={title}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="Contoh: Mandiri Mini Soccer Cup 2026"
-                className="text-xs h-9"
-                required
-              />
-            </div>
-
-            {/* Event type module: terms, grouping rules, defaults */}
-            <div>
-              <label htmlFor="event-type" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Jenis Event
-              </label>
-              <select
-                id="event-type"
-                value={eventType}
-                onChange={(e) => handleEventTypeChange(e.target.value)}
-                className="h-9 w-full rounded-lg border border-neutral-200 bg-white px-2 text-xs dark:border-neutral-800 dark:bg-neutral-800"
-              >
-                {listEventTypes().map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-[11px] text-neutral-500">{resolveEventType({ event_type: eventType }).description}</p>
-              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-                <input
-                  type="checkbox"
-                  checked={groupingEnabled}
-                  onChange={(e) => setGroupingEnabled(e.target.checked)}
-                  className="rounded border-neutral-300"
-                />
-                Aktifkan fitur {resolveEventType({ event_type: eventType }).labels.groupingAction.toLowerCase()}
-              </label>
-            </div>
-
-            {/* Slug URL */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                URL Slug (/e/[slug]) <span className="text-red-500">*</span>
-              </label>
-              <Input
-                type="text"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                placeholder="mini-soccer-championship"
-                className="text-xs h-9 font-mono"
-                required
-              />
-            </div>
-
-            {/* Organizer Name */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Penyelenggara (Nama Akun Admin / Organisasi)
-              </label>
-              <Input
-                type="text"
-                value={organizerName}
-                onChange={(e) => setOrganizerName(e.target.value)}
-                placeholder="Contoh: Budi Santoso / Panitia Turnamen"
-                className="text-xs h-9"
-              />
-              <span className="text-[11px] text-neutral-400">
-                Ditampilkan di card event beranda utama sebagai nama akun penyelenggara.
-              </span>
-            </div>
-
-            {/* Status Event */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Status Event
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as EventStatus)}
-                className="flex h-9 w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-              >
-                <option value="open">Buka (Terima Pendaftaran Publik)</option>
-                <option value="draft">Draft (Hanya Admin)</option>
-                <option value="closed">Tutup (Form Dinonaktifkan)</option>
-              </select>
-            </div>
-
-            {/* Prefix Code */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Prefix Kode Tiket (Maks. 5 Karakter)
-              </label>
-              <Input
-                type="text"
-                value={prefixCode}
-                onChange={(e) => setPrefixCode(e.target.value.toUpperCase().slice(0, 5))}
-                placeholder="MSC / EVT"
-                className="text-xs h-9 font-mono uppercase"
-              />
-              <span className="text-[11px] text-neutral-400">Contoh format: {prefixCode}-2026-0001</span>
-            </div>
-
-            {/* Location */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Lokasi Pelaksanaan
-              </label>
-              <Input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Contoh: Grand Futsal Arena, Jakarta Selatan"
-                className="text-xs h-9"
-              />
-              <label htmlFor="location-url" className="mt-2 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block mb-1">
-                Link Lokasi (Google Maps), opsional
-              </label>
-              <Input
-                id="location-url"
-                type="url"
-                inputMode="url"
-                value={locationUrl}
-                onChange={(e) => setLocationUrl(e.target.value)}
-                placeholder="https://maps.app.goo.gl/..."
-                aria-invalid={!!locationUrl.trim() && !isHttpUrl(locationUrl)}
-                className="text-xs h-9"
-              />
-              <p className="text-[11px] text-neutral-400 mt-1">
-                {locationUrl.trim() && !isHttpUrl(locationUrl)
-                  ? 'Harus URL lengkap, diawali https://'
-                  : 'Kosongkan untuk membuka pencarian Google Maps dari alamat di atas.'}
-              </p>
-            </div>
-
-            {/* Quota */}
-            <div>
-              <label htmlFor="quota" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Kuota (0 = tanpa batas)
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="quota"
-                  type="number"
-                  min={0}
-                  value={quota}
-                  onChange={(e) => setQuota(Number(e.target.value))}
-                  className="text-xs h-9 w-24"
-                />
-                <select
-                  aria-label="Satuan kuota"
-                  value={quotaMode}
-                  onChange={(e) => setQuotaMode(e.target.value as QuotaMode)}
-                  className="h-9 flex-1 rounded-lg border border-neutral-200 bg-white px-2 text-xs dark:border-neutral-800 dark:bg-neutral-800"
-                >
-                  <option value="registration">per pendaftaran (mis. per tim)</option>
-                  <option value="participant">per peserta (baris repeater)</option>
-                </select>
-              </div>
-              <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-                <input
-                  type="checkbox"
-                  checked={waitlistEnabled}
-                  onChange={(e) => setWaitlistEnabled(e.target.checked)}
-                  className="rounded border-neutral-300"
-                />
-                Terima daftar tunggu saat kuota penuh
-              </label>
-            </div>
-
-            {/* Starts At */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Tanggal & Waktu Mulai Event
-              </label>
-              <Input
-                type="datetime-local"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-                className="text-xs h-9"
-              />
-            </div>
-
-            {/* Registration Deadline */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Batas Akhir Pendaftaran
-              </label>
-              <Input
-                type="datetime-local"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="text-xs h-9"
-              />
-            </div>
-
-            {/* Cover / Banner Upload */}
-            <div className="md:col-span-2">
-              <ImageUploadField
-                label="Banner / Cover Gambar Event"
-                value={coverUrl}
-                onChange={setCoverUrl}
-                folder="banners"
-                aspectRatio="video"
-                helperText="Gambar ini akan tampil di bagian atas halaman pendaftaran publik."
-              />
-            </div>
-
-            {/* Description (Markdown Support) */}
-            <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Deskripsi Event & Ketentuan (Mendukung Markdown)
-              </label>
-              <Textarea
-                rows={5}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Tuliskan informasi lengkap, jadwal, hadiah, dan regulasi acara di sini..."
-                className="text-xs font-mono"
-              />
-            </div>
-          </div>
-
-          {/* Pricing Section */}
-          <div className="border-t border-neutral-200 pt-5 dark:border-neutral-800 space-y-4">
-            <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              <span>Biaya & Tipe Pendaftaran</span>
-            </h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                  Skema Harga
-                </label>
-                <select
-                  value={priceType}
-                  onChange={(e) => setPriceType(e.target.value as PriceType)}
-                  className="flex h-9 w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-                >
-                  <option value="free">Gratis (Tanpa Biaya)</option>
-                  <option value="fixed">Biaya Tetap (Per Tim / Per Pendaftaran)</option>
-                  <option value="per_participant">Dihitung Per Peserta (Mengikuti Jumlah Repeater)</option>
-                </select>
-              </div>
-
-              {priceType !== 'free' && (
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                    Nominal Biaya (Rp)
-                  </label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={5000}
-                    value={priceAmount}
-                    onChange={(e) => setPriceAmount(Number(e.target.value))}
-                    className="text-xs h-9"
-                  />
-                  <span className="text-[11px] text-neutral-400">
-                    Format tampilan: {formatRupiah(priceAmount)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* WhatsApp & Success Message Settings */}
-          <div className="border-t border-neutral-200 pt-5 dark:border-neutral-800 space-y-4">
-            <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-              Pesan Konfirmasi & Template WhatsApp
-            </h4>
-
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Template Pesan WhatsApp Otomatis (wa.me)
-              </label>
-              <Textarea
-                rows={4}
-                value={waTemplate}
-                onChange={(e) => setWaTemplate(e.target.value)}
-                placeholder="Gunakan variabel {event}, {kode}, {nama}, {total}, {bukti}"
-                className="text-xs font-mono"
-              />
-              <p className="text-[11px] text-neutral-400 mt-1">
-                Variabel yang tersedia: <code>{'{event}'}</code>, <code>{'{kode}'}</code>, <code>{'{nama}'}</code>, <code>{'{total}'}</code>, <code>{'{bukti}'}</code>
-              </p>
-            </div>
-
-            {/* Messages organizers send to participants (lib/notifications) */}
-            <details className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-              <summary className="cursor-pointer text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                Template pesan ke peserta (status, daftar tunggu)
-              </summary>
-              <p className="mt-2 text-[11px] text-neutral-500">
-                Kosongkan untuk memakai teks bawaan. Variabel: {TEMPLATE_VARIABLES.map((v) => `{${v}}`).join(', ')}
-              </p>
-              <div className="mt-3 space-y-3">
-                {NOTIFICATION_KINDS.filter((k) => k.kind !== 'registration_received').map(({ kind, label }) => (
-                  <div key={kind}>
-                    <label htmlFor={`tpl-${kind}`} className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block mb-1">
-                      {label}
-                    </label>
-                    <Textarea
-                      id={`tpl-${kind}`}
-                      rows={3}
-                      value={notificationTemplates[kind] ?? ''}
-                      onChange={(e) => setNotificationTemplates((prev) => ({ ...prev, [kind]: e.target.value }))}
-                      placeholder={DEFAULT_TEMPLATES[kind]}
-                      className="text-xs font-mono"
-                    />
-                  </div>
-                ))}
-              </div>
-            </details>
-
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                Pesan Sukses di Halaman Konfirmasi Tiket
-              </label>
-              <Input
-                type="text"
-                value={successMessage}
-                onChange={(e) => setSuccessMessage(e.target.value)}
-                placeholder="Pesan yang tampil setelah pendaftar berhasil submit form"
-                className="text-xs h-9"
-              />
-            </div>
-          </div>
-        </div>
+        <SettingsTab
+          title={title}
+          handleTitleChange={handleTitleChange}
+          eventType={eventType}
+          handleEventTypeChange={handleEventTypeChange}
+          groupingEnabled={groupingEnabled}
+          setGroupingEnabled={setGroupingEnabled}
+          slug={slug}
+          setSlug={setSlug}
+          organizerName={organizerName}
+          setOrganizerName={setOrganizerName}
+          status={status}
+          setStatus={setStatus}
+          coverUrl={coverUrl}
+          setCoverUrl={setCoverUrl}
+          startsAt={startsAt}
+          setStartsAt={setStartsAt}
+          deadline={deadline}
+          setDeadline={setDeadline}
+          location={location}
+          setLocation={setLocation}
+          locationUrl={locationUrl}
+          setLocationUrl={setLocationUrl}
+          quota={quota}
+          setQuota={setQuota}
+          quotaMode={quotaMode}
+          setQuotaMode={setQuotaMode}
+          waitlistEnabled={waitlistEnabled}
+          setWaitlistEnabled={setWaitlistEnabled}
+          priceType={priceType}
+          setPriceType={setPriceType}
+          priceAmount={priceAmount}
+          setPriceAmount={setPriceAmount}
+          prefixCode={prefixCode}
+          setPrefixCode={setPrefixCode}
+          waTemplate={waTemplate}
+          setWaTemplate={setWaTemplate}
+          notificationTemplates={notificationTemplates}
+          setNotificationTemplates={setNotificationTemplates}
+          successMessage={successMessage}
+          setSuccessMessage={setSuccessMessage}
+        />
       )}
 
       {/* TAB 3: LIVE PREVIEW */}
       {activeTab === 'preview' && (
-        <div className="space-y-4 animate-in fade-in">
-          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 font-medium">
-              <Eye className="h-4 w-4" />
-              Mode Pratinjau Interaktif — Semua field formulir tampil sesuai susunan di editor.
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setActiveTab('editor')}
-              className="h-7 text-xs bg-white dark:bg-neutral-900"
-            >
-              Kembali ke Editor
-            </Button>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-200/90 bg-white p-6 sm:p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 max-w-2xl mx-auto space-y-6">
-            {coverUrl && (
-              <div className="h-44 w-full overflow-hidden rounded-xl bg-neutral-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={coverUrl} alt="Preview Cover" className="h-full w-full object-cover" />
-              </div>
-            )}
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="success">Pendaftaran Terbuka</Badge>
-                <Badge variant="outline">
-                  {priceType === 'free' ? 'Gratis' : formatRupiah(priceAmount)}
-                </Badge>
-              </div>
-              <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-neutral-100">
-                {title || 'Judul Event'}
-              </h2>
-              {organizerName && (
-                <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 mt-1">
-                  Penyelenggara: <strong>{organizerName}</strong>
-                </p>
-              )}
-              {location && <p className="text-xs text-neutral-500 mt-0.5">{location}</p>}
-            </div>
-
-            <div className="space-y-5 border-t border-neutral-100 pt-5 dark:border-neutral-800">
-              {/* Unified Dynamic Form Fields Preview */}
-              <div className="space-y-5">
-                {fields.map((field) => (
-                  <DynamicFormField
-                    key={field.id}
-                    field={field}
-                    value={previewAnswers[field.id]}
-                    onChange={(val) =>
-                      setPreviewAnswers((prev) => ({
-                        ...prev,
-                        [field.id]: val,
-                      }))
-                    }
-                  />
-                ))}
-              </div>
-
-              <div className="pt-2">
-                <Button disabled className="w-full text-xs font-semibold h-10">
-                  Kirim Pendaftaran & Dapatkan Kode Tiket (Pratinjau)
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PreviewTab
+          coverUrl={coverUrl}
+          priceType={priceType}
+          priceAmount={priceAmount}
+          title={title}
+          organizerName={organizerName}
+          location={location}
+          fields={fields}
+          previewAnswers={previewAnswers}
+          setPreviewAnswers={setPreviewAnswers}
+          setActiveTab={setActiveTab}
+        />
       )}
     </div>
   );

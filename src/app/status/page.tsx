@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { checkStatus, getOrganizationSettings, formatRupiah, formatIndoDate } from '@/lib/store';
+import { checkStatus, getOrganizationSettings } from '@/lib/store';
+import { formatRupiah, formatIndoDate } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { RegistrationStatusResult, OrganizationSettings } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +45,7 @@ function StatusContent() {
       const res = await checkStatus(targetCode, targetPhone);
       setResult(res);
     } catch (err) {
-      console.error('Error checking status:', err);
+      logger.error('status', 'Error checking status:', err);
       setResult(null);
     } finally {
       setLoading(false);

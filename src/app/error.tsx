@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/logger';
 
 export default function RootError({
   error,
@@ -13,7 +14,7 @@ export default function RootError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Unhandled runtime error in application:', error);
+    logger.error('app', 'Unhandled runtime error in application:', error);
   }, [error]);
 
   return (

@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Shuffle, Users } from 'lucide-react';
-import { getEventBySlug, formatIndoDate } from '@/lib/store';
+import { getEventBySlug } from '@/lib/store';
+import { formatIndoDate } from '@/lib/utils';
 import { getPublicDraw, type PublicDraw } from '@/lib/draws';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';

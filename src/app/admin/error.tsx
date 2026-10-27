@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, RotateCcw, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/logger';
 
 export default function AdminError({
   error,
@@ -13,7 +14,7 @@ export default function AdminError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Unhandled admin panel runtime error:', error);
+    logger.error('admin', 'Unhandled admin panel runtime error:', error);
   }, [error]);
 
   return (

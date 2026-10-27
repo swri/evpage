@@ -1,5 +1,6 @@
 import { createClient } from './supabase/client.ts';
 import { createOrganization } from './orgs.ts';
+import { logger } from './logger.ts';
 
 export interface AdminUser {
   id: string;
@@ -156,7 +157,7 @@ export async function registerAdmin(params: {
     try {
       await createOrganization(orgClean || nameClean, session);
     } catch (err) {
-      console.error('create_organization after sign-up failed:', err);
+      logger.error('auth', 'create_organization after sign-up failed:', err);
     }
     persistSession(session);
     return { success: true, session };

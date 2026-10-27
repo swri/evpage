@@ -8,10 +8,10 @@ import {
   createRegistration,
   calculateRegistrationAmount,
   remainingSlots,
-  formatRupiah,
-  formatIndoDate,
   buildWhatsAppLink,
 } from '@/lib/store';
+import { formatRupiah, formatIndoDate } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { EventItem, OrganizationSettings, Registration } from '@/types';
 import { DynamicFormField } from '@/components/form/dynamic-form-field';
 import { Button } from '@/components/ui/button';
@@ -110,7 +110,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
         setOrgSettings(settings);
         setAnswers(initialAnswersFor(evt));
       } catch (err) {
-        console.error('Error loading event:', err);
+        logger.error('registration', 'Error loading event:', err);
       } finally {
         setLoading(false);
       }

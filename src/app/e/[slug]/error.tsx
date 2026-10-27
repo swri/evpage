@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/logger';
 
 export default function EventPublicError({
   error,
@@ -13,7 +14,7 @@ export default function EventPublicError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Unhandled public event page runtime error:', error);
+    logger.error('public-event', 'Unhandled public event page runtime error:', error);
   }, [error]);
 
   return (

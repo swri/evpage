@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getCurrentAdminSession, type AdminSession } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 import {
   canManageEventIn,
   getMyInvitations,
@@ -45,7 +46,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
       setActive(resolveActiveOrganization(orgs));
       setInvitations(invites);
     } catch (err) {
-      console.error('Failed to load organizations:', err);
+      logger.error('org-context', 'Failed to load organizations:', err);
     } finally {
       setLoading(false);
     }

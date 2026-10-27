@@ -10,6 +10,7 @@
 import { cacheLife, cacheTag } from 'next/cache';
 import { EVENTS_TAG, drawTag, eventTag } from './cache-tags';
 import { createPublicSupabase, fetchOpenEvents, fetchPublicDraw, fetchPublicEvent } from './public-data';
+import { logger } from '../logger';
 
 export type CachedResult<T> = { ok: true; data: T } | { ok: false };
 
@@ -19,7 +20,7 @@ async function attempt<T>(label: string, read: () => Promise<T>): Promise<Cached
     cacheLife('minutes');
     return { ok: true, data };
   } catch (err) {
-    console.error(`Server prefetch (${label}) failed, the page will load it in the browser:`, err);
+    logger.error('public-cache', `Server prefetch (${label}) failed, the page will load it in the browser:`, err);
     cacheLife('seconds');
     return { ok: false };
   }

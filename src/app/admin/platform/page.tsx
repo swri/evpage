@@ -19,7 +19,7 @@ import {
   type OrphanProof,
   type PlatformOverview,
 } from '@/lib/cleanup';
-import { formatIndoDate } from '@/lib/store';
+import { formatIndoDate } from '@/lib/utils';
 import { refreshPublicPages } from '@/lib/public-refresh';
 import { AdminPageSkeleton } from '@/components/ui/skeleton';
 
