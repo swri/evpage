@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Shuffle,
   Users,
@@ -110,6 +111,30 @@ export function RandomTeamModal({
     teamId: string;
     player: PlayerParticipant;
   } | null>(null);
+
+  const isClient = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onOpenChange(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onOpenChange]);
 
   // Run initial shuffle when players change or when opening
   const handleShuffleTeams = () => {
@@ -289,14 +314,20 @@ export function RandomTeamModal({
     document.body.removeChild(link);
   };
 
-  if (!open) return null;
+  if (!open || !isClient) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${L.groupingAction} & Undian Bagan`}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+    >
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in"
         onClick={() => onOpenChange(false)}
+        aria-hidden="true"
       />
 
       {/* Main Container */}
@@ -777,6 +808,7 @@ export function RandomTeamModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

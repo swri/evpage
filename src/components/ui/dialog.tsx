@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { usePresence } from './use-presence';
 
@@ -10,6 +11,7 @@ interface DialogProps {
   children: React.ReactNode;
   ariaLabel?: string;
   ariaLabelledBy?: string;
+  className?: string;
 }
 
 function useFocusTrap(open: boolean, onEscape?: () => void) {
@@ -81,18 +83,28 @@ function useFocusTrap(open: boolean, onEscape?: () => void) {
   return containerRef;
 }
 
+function useIsClient() {
+  return React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
+
 export function Dialog({
   open,
   onOpenChange,
   children,
   ariaLabel = 'Dialog',
   ariaLabelledBy,
+  className,
 }: DialogProps) {
+  const isClient = useIsClient();
   const containerRef = useFocusTrap(open, () => onOpenChange(false));
   const { mounted, closing } = usePresence(open);
-  if (!mounted) return null;
+  if (!isClient || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 ${closing ? 'pointer-events-none' : ''}`}>
       {/* Backdrop */}
       <div
@@ -110,7 +122,7 @@ export function Dialog({
         tabIndex={-1}
         className={`relative z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-800 dark:bg-neutral-900 outline-none ${
           closing ? 'animate-out fade-out zoom-out-95' : 'animate-in fade-in zoom-in-95'
-        }`}
+        } ${className ?? ''}`}
       >
         <button
           onClick={() => onOpenChange(false)}
@@ -121,7 +133,8 @@ export function Dialog({
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -133,6 +146,7 @@ export function Sheet({
   side = 'right',
   ariaLabel = 'Panel Samping',
   ariaLabelledBy,
+  className,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -140,12 +154,14 @@ export function Sheet({
   side?: 'right' | 'left';
   ariaLabel?: string;
   ariaLabelledBy?: string;
+  className?: string;
 }) {
+  const isClient = useIsClient();
   const containerRef = useFocusTrap(open, () => onOpenChange(false));
   const { mounted, closing } = usePresence(open);
-  if (!mounted) return null;
+  if (!isClient || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className={`fixed inset-0 z-50 overflow-hidden ${closing ? 'pointer-events-none' : ''}`}>
       <div
         className={`fixed inset-0 bg-black/40 backdrop-blur-xs ${closing ? 'animate-out fade-out' : 'animate-in fade-in'}`}
@@ -162,7 +178,7 @@ export function Sheet({
           tabIndex={-1}
           className={`w-screen max-w-xl bg-white dark:bg-neutral-900 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl p-6 overflow-y-auto relative outline-none ${
             closing ? 'animate-out slide-out-to-right' : 'animate-in slide-in-from-right'
-          }`}
+          } ${className ?? ''}`}
         >
           <button
             onClick={() => onOpenChange(false)}
@@ -174,7 +190,8 @@ export function Sheet({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
