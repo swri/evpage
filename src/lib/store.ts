@@ -71,13 +71,59 @@ export async function getAllEvents(): Promise<EventItem[]> {
     events = memoryEvents;
   }
 
-  // Calculate registration counts & revenue for each event
+  if (events.length === 0) {
+    return [];
+  }
+
+  // Supabase mode: aggregate counts via RPC without downloading all registrations
+  if (supabase) {
+    const eventIds = events.map((e) => e.id);
+    const { data: statsData, error: statsError } = await supabase.rpc('get_event_admin_stats', {
+      p_event_ids: eventIds,
+    });
+
+    if (!statsError && statsData && Array.isArray(statsData)) {
+      type AdminStats = {
+        event_id: string;
+        slots_used: number;
+        total_registrations: number;
+        verified_registrations: number;
+        pending_registrations: number;
+        rejected_registrations: number;
+        total_revenue: number;
+      };
+      const statsMap = new Map<string, AdminStats>(
+        (statsData as AdminStats[]).map((s) => [s.event_id, s])
+      );
+
+      return events.map((evt) => {
+        const s = statsMap.get(evt.id);
+        const verified = s?.verified_registrations ?? 0;
+        const pending = s?.pending_registrations ?? 0;
+        return {
+          ...evt,
+          active_registrations: verified + pending,
+          slots_used: s?.slots_used ?? 0,
+          total_registrations: s?.total_registrations ?? 0,
+          verified_registrations: verified,
+          pending_registrations: pending,
+          rejected_registrations: s?.rejected_registrations ?? 0,
+          total_revenue: s?.total_revenue ?? 0,
+        };
+      });
+    }
+
+    // Fallback if RPC is not deployed yet: attach public slot counts
+    return attachPublicSlotCounts(events);
+  }
+
+  // Demo / local mode calculation
   const regs = await getAllRegistrations();
-  const withCounts = events.map(evt => {
-    const eventRegs = regs.filter(r => r.event_id === evt.id);
-    const verified = eventRegs.filter(r => r.status === 'verified');
-    const pending = eventRegs.filter(r => r.status === 'pending');
-    const rejected = eventRegs.filter(r => r.status === 'rejected');
+  return events.map((evt) => {
+    const eventRegs = regs.filter((r) => r.event_id === evt.id);
+    const verified = eventRegs.filter((r) => r.status === 'verified');
+    const pending = eventRegs.filter((r) => r.status === 'pending');
+    const rejected = eventRegs.filter((r) => r.status === 'rejected');
     const revenue = verified.reduce((sum, r) => sum + (r.total_amount || 0), 0);
 
     return {
@@ -88,10 +134,9 @@ export async function getAllEvents(): Promise<EventItem[]> {
       verified_registrations: verified.length,
       pending_registrations: pending.length,
       rejected_registrations: rejected.length,
-      total_revenue: revenue
+      total_revenue: revenue,
     };
   });
-  return supabase ? attachPublicSlotCounts(withCounts) : withCounts;
 }
 
 /**

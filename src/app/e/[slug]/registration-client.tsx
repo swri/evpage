@@ -695,6 +695,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                       <DynamicFormField
                         key={field.id}
                         field={field}
+                        eventId={event.id}
                         value={answers[field.id]}
                         onChange={(val) => {
                           setAnswers((prev) => ({

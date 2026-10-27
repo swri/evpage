@@ -5,7 +5,8 @@ import { FormField } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Upload, AlertCircle, FileText } from 'lucide-react';
+import { Plus, Trash2, Upload, AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { storeFormAttachment } from '@/lib/form-attachments';
 
 interface DynamicFormFieldProps {
   field: FormField;
@@ -13,6 +14,7 @@ interface DynamicFormFieldProps {
   onChange: (value: any) => void;
   error?: string;
   disabled?: boolean;
+  eventId?: string;
 }
 
 export function DynamicFormField({
@@ -20,7 +22,8 @@ export function DynamicFormField({
   value,
   onChange,
   error,
-  disabled
+  disabled,
+  eventId
 }: DynamicFormFieldProps) {
   const { id, type, label, placeholder, helperText, validation, options, subFields } = field;
   const isRequired = validation?.required;
@@ -212,81 +215,14 @@ export function DynamicFormField({
         );
 
       case 'file':
-        const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-
-          // Check file size (5MB)
-          if (file.size > 5 * 1024 * 1024) {
-            alert('Ukuran file maksimal 5 MB');
-            return;
-          }
-
-          // Generate local base64 preview or object URL
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            onChange({
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              url: reader.result as string
-            });
-          };
-          reader.readAsDataURL(file);
-        };
-
-        const fileData = typeof value === 'object' && value !== null ? value : null;
-
         return (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <label className="relative inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-2xs hover:bg-neutral-50 cursor-pointer dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 transition-colors">
-                <Upload className="h-4 w-4" />
-                <span>Pilih Berkas</span>
-                <input
-                  id={id}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  onChange={handleFileUpload}
-                  disabled={disabled}
-                  className="sr-only"
-                />
-              </label>
-
-              {fileData && (
-                <button
-                  type="button"
-                  onClick={() => onChange(null)}
-                  className="text-xs text-red-600 hover:underline dark:text-red-400"
-                >
-                  Hapus file
-                </button>
-              )}
-            </div>
-
-            {fileData && (
-              <div className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-800/50">
-                {fileData.type?.startsWith('image/') ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={fileData.url}
-                    alt={fileData.name}
-                    className="h-12 w-12 rounded object-cover border border-neutral-200 dark:border-neutral-700"
-                  />
-                ) : (
-                  <FileText className="h-8 w-8 text-neutral-500" />
-                )}
-                <div className="overflow-hidden">
-                  <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-                    {fileData.name}
-                  </div>
-                  <div className="text-xs text-neutral-500">
-                    {(fileData.size / 1024).toFixed(1)} KB
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <FileInputField
+            id={id}
+            value={value}
+            disabled={disabled}
+            onChange={onChange}
+            eventId={eventId}
+          />
         );
 
       case 'repeater': {
@@ -448,3 +384,109 @@ export function DynamicFormField({
     </div>
   );
 }
+
+function FileInputField({
+  id,
+  value,
+  disabled,
+  onChange,
+  eventId = 'form-uploads',
+}: {
+  id: string;
+  value: any;
+  disabled?: boolean;
+  onChange: (val: any) => void;
+  eventId?: string;
+}) {
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErrorMsg(null);
+    setIsUploading(true);
+    try {
+      const stored = await storeFormAttachment(eventId, file);
+      onChange(stored);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Gagal mengunggah berkas.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const fileData = typeof value === 'object' && value !== null ? value : null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <label
+          className={`relative inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-2xs hover:bg-neutral-50 cursor-pointer dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 transition-colors ${
+            disabled || isUploading ? 'opacity-50 pointer-events-none' : ''
+          }`}
+        >
+          {isUploading ? <Loader2 className="h-4 w-4 animate-spin text-neutral-500" /> : <Upload className="h-4 w-4" />}
+          <span>{isUploading ? 'Mengunggah...' : 'Pilih Berkas'}</span>
+          <input
+            id={id}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={handleFileUpload}
+            disabled={disabled || isUploading}
+            className="sr-only"
+          />
+        </label>
+
+        {fileData && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-xs text-red-600 hover:underline dark:text-red-400"
+          >
+            Hapus file
+          </button>
+        )}
+      </div>
+
+      {errorMsg && <p className="text-xs text-red-500 font-medium">{errorMsg}</p>}
+
+      {fileData && (
+        <div className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-800/50">
+          {fileData.type?.startsWith('image/') ||
+          (typeof fileData.url === 'string' &&
+            (fileData.url.startsWith('data:image') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(fileData.url))) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={fileData.url}
+              alt={fileData.name}
+              className="h-12 w-12 rounded object-cover border border-neutral-200 dark:border-neutral-700"
+            />
+          ) : (
+            <FileText className="h-8 w-8 text-neutral-500" />
+          )}
+          <div className="overflow-hidden flex-1">
+            <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
+              {fileData.name}
+            </div>
+            <div className="text-xs text-neutral-500">
+              {fileData.size ? `${(fileData.size / 1024).toFixed(1)} KB` : 'Berkas Terunggah'}
+            </div>
+          </div>
+          {fileData.url && (
+            <a
+              href={fileData.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 underline shrink-0"
+            >
+              Lihat
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+

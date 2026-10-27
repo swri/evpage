@@ -167,6 +167,21 @@ function EventRegistrationsContent({
     });
   }, [registrations, statusFilter, searchQuery]);
 
+  // Pagination state (25 or 50 items per page)
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Reset to page 1 on filter, search, or pageSize change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery, pageSize]);
+
+  const totalPages = Math.ceil(filteredRegistrations.length / pageSize) || 1;
+  const paginatedRegistrations = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRegistrations.slice(start, start + pageSize);
+  }, [filteredRegistrations, currentPage, pageSize]);
+
   // Statistics calculation
   const stats = useMemo(() => {
     const total = registrations.length;
@@ -763,7 +778,7 @@ function EventRegistrationsContent({
                   </td>
                 </tr>
               ) : (
-                filteredRegistrations.map((reg) => {
+                paginatedRegistrations.map((reg) => {
                   const isSelected = selectedIds.includes(reg.id);
 
                   // Primary answer summary (e.g. team name or first answer)
@@ -965,6 +980,54 @@ function EventRegistrationsContent({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {filteredRegistrations.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400">
+            <div className="flex items-center gap-2">
+              <span>Baris per halaman:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="rounded border border-neutral-300 bg-white px-2 py-1 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span className="text-neutral-400">|</span>
+              <span>
+                Menampilkan {(currentPage - 1) * pageSize + 1} -{' '}
+                {Math.min(currentPage * pageSize, filteredRegistrations.length)} dari{' '}
+                {filteredRegistrations.length} data
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="h-7 px-2.5 text-xs"
+              >
+                Sebelumnya
+              </Button>
+              <div className="px-2 font-medium">
+                Halaman {currentPage} dari {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="h-7 px-2.5 text-xs"
+              >
+                Selanjutnya
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* REGISTRATION DETAIL DRAWER (SHEET) */}
