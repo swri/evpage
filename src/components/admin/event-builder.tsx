@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast-context';
 import { DynamicFormField } from '@/components/form/dynamic-form-field';
+import { ImageUploadField } from '@/components/ui/image-upload-field';
 import {
   Save,
   ArrowLeft,
@@ -1264,24 +1265,16 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
               />
             </div>
 
-            {/* Cover URL */}
+            {/* Cover / Banner Upload */}
             <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                URL Banner / Cover Gambar
-              </label>
-              <Input
-                type="url"
+              <ImageUploadField
+                label="Banner / Cover Gambar Event"
                 value={coverUrl}
-                onChange={(e) => setCoverUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="text-xs h-9"
+                onChange={setCoverUrl}
+                folder="banners"
+                aspectRatio="video"
+                helperText="Gambar ini akan tampil di bagian atas halaman pendaftaran publik."
               />
-              {coverUrl && (
-                <div className="mt-2 h-28 w-full max-w-sm overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 dark:border-neutral-800">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={coverUrl} alt="Cover Preview" className="h-full w-full object-cover" />
-                </div>
-              )}
             </div>
 
             {/* Description (Markdown Support) */}

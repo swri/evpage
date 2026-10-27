@@ -19,7 +19,7 @@ import {
   HelpCircle,
   MessageSquare,
   ShieldAlert,
-  FileCheck2,
+  Printer,
 } from 'lucide-react';
 
 function StatusContent() {
@@ -206,22 +206,13 @@ function StatusContent() {
                 </div>
               )}
 
-              {/* Verified Badge Details */}
+              {/* Digital E-Ticket & Verified Badge */}
               {result.status === 'verified' && (
-                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-xs text-emerald-900 dark:bg-emerald-950/50 dark:border-emerald-900 dark:text-emerald-200">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <FileCheck2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>Pembayaran & Berkas Telah Diverifikasi Panitia</span>
-                  </div>
-                  <p className="mt-1 text-emerald-700 dark:text-emerald-300">
-                    Selamat, pendaftaran Anda telah resmi terdaftar! Simpan kode tiket ini saat menghadiri event.
-                  </p>
-                  {result.verified_at && (
-                    <div className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400">
-                      Diverifikasi pada: {formatIndoDate(result.verified_at, true)}
-                    </div>
-                  )}
-                </div>
+                <DigitalTicketCard
+                  registration={result}
+                  phone={phone}
+                  orgName={orgSettings?.name}
+                />
               )}
 
               {/* WA Help Button / Contact Alternative */}
@@ -256,6 +247,114 @@ function StatusContent() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function DigitalTicketCard({
+  registration,
+  phone,
+  orgName,
+}: {
+  registration: RegistrationStatusResult;
+  phone: string;
+  orgName?: string;
+}) {
+  const qrData =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/status?code=${encodeURIComponent(registration.code)}&phone=${encodeURIComponent(phone)}`
+      : registration.code;
+
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="rounded-xl border-2 border-dashed border-emerald-500/40 bg-gradient-to-b from-emerald-50/50 to-white p-5 dark:from-emerald-950/20 dark:to-neutral-900 shadow-sm space-y-4 print:border-solid print:p-6 print:m-0">
+      <div className="flex items-start justify-between gap-4 border-b border-emerald-200/60 pb-3 dark:border-emerald-800/40">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+            {orgName || 'E-TIKET RESMI'}
+          </span>
+          <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
+            {registration.event_title || 'Kartu Peserta Resmi'}
+          </h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            Tunjukkan kode QR ini kepada panitia saat registrasi ulang di lokasi acara.
+          </p>
+        </div>
+        <div className="rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white shrink-0">
+          ✓ Terverifikasi
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center gap-5">
+        <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white border border-neutral-200 shadow-2xs dark:border-neutral-800 shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={qrImageUrl}
+            alt={`QR Code ${registration.code}`}
+            className="h-32 w-32 object-contain"
+          />
+          <span className="mt-1 font-mono text-[11px] font-bold text-neutral-800 tracking-wider">
+            {registration.code}
+          </span>
+        </div>
+
+        <div className="flex-1 space-y-2.5 text-xs w-full">
+          <div>
+            <span className="text-neutral-500 block">Nama Peserta / Tim:</span>
+            <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+              {registration.contact_name}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="text-neutral-500 block">WhatsApp:</span>
+              <span className="font-medium text-neutral-800 dark:text-neutral-200 font-mono">
+                {phone || '-'}
+              </span>
+            </div>
+            <div>
+              <span className="text-neutral-500 block">Total Biaya:</span>
+              <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+                {registration.total_amount === 0 ? 'Gratis' : formatRupiah(registration.total_amount)}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-200/60 dark:border-neutral-800">
+            <div>
+              <span className="text-neutral-500 block">Tanggal Mendaftar:</span>
+              <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                {formatIndoDate(registration.created_at)}
+              </span>
+            </div>
+            <div>
+              <span className="text-neutral-500 block">Diverifikasi:</span>
+              <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                {registration.verified_at ? formatIndoDate(registration.verified_at) : 'Ya'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-2 flex items-center justify-end print:hidden">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handlePrint}
+          className="text-xs h-8 gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40 cursor-pointer"
+        >
+          <Printer className="h-3.5 w-3.5" />
+          <span>Cetak / Simpan Tiket</span>
+        </Button>
+      </div>
     </div>
   );
 }

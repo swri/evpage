@@ -8,7 +8,7 @@ import { AdminPageSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast-context';
-import { AppLogo } from '@/components/ui/app-logo';
+import { ImageUploadField } from '@/components/ui/image-upload-field';
 import {
   Save,
   Building,
@@ -185,29 +185,14 @@ export default function AdminSettingsPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-950 p-2 text-white">
-                  {logoUrl && logoUrl !== '/icon.svg' ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
-                  ) : (
-                    <AppLogo size="sm" iconOnly={true} />
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  <Input
-                    type="text"
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    placeholder="Contoh: /icon.svg atau https://domain.com/logo.png"
-                    className="text-xs h-9"
-                  />
-                  <span className="text-[11px] text-neutral-400">
-                    Kosongkan atau gunakan <code>/icon.svg</code> untuk menggunakan logo tema hitam-putih EVP.
-                  </span>
-                </div>
-              </div>
+              <ImageUploadField
+                label=""
+                value={logoUrl}
+                onChange={setLogoUrl}
+                folder="logos"
+                aspectRatio="square"
+                helperText="Format gambar logo kotak atau transparan (PNG, SVG, WEBP). Gunakan /icon.svg untuk default."
+              />
             </div>
           </div>
         </div>
@@ -266,19 +251,14 @@ export default function AdminSettingsPage() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-              URL Barcode / QRIS Pembayaran
-            </label>
-            <Input
-              type="url"
+            <ImageUploadField
+              label="Barcode / Gambar QRIS Pembayaran"
               value={qrisUrl}
-              onChange={(e) => setQrisUrl(e.target.value)}
-              placeholder="https://example.com/qris.jpg"
-              className="text-xs h-9"
+              onChange={setQrisUrl}
+              folder="qris"
+              aspectRatio="square"
+              helperText="Pendaftar dapat memindai QRIS ini di form pendaftaran untuk pembayaran cepat."
             />
-            <span className="text-[11px] text-neutral-400">
-              Pendaftar dapat memindai QRIS ini di form pendaftaran untuk pembayaran cepat.
-            </span>
           </div>
 
           <div>
