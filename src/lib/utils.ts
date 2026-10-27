@@ -14,8 +14,12 @@ export function formatRupiah(amount: number): string {
   }).format(amount);
 }
 
-// Helper to format Indonesian dates
-export function formatIndoDate(dateString?: string, withTime = false): string {
+// Helper to format Indonesian dates (standardized to WIB / Asia/Jakarta)
+export function formatIndoDate(
+  dateString?: string,
+  withTime = false,
+  timeZone = 'Asia/Jakarta'
+): string {
   if (!dateString) return '-';
   try {
     const d = new Date(dateString);
@@ -23,12 +27,36 @@ export function formatIndoDate(dateString?: string, withTime = false): string {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
+      timeZone,
       ...(withTime ? { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' } : {}),
     };
     return new Intl.DateTimeFormat('id-ID', options).format(d);
   } catch {
     return dateString;
   }
+}
+
+/**
+ * Converts an ISO date string to a 'YYYY-MM-DDTHH:mm' string in WIB (Asia/Jakarta).
+ * Ideal for setting default values on HTML <input type="datetime-local">.
+ */
+export function toWIBDateTimeInput(dateString?: string | null): string {
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('sv-SE', { timeZone: 'Asia/Jakarta' }).replace(' ', 'T').slice(0, 16);
+}
+
+/**
+ * Converts a 'YYYY-MM-DDTHH:mm' local string entered in WIB into an ISO UTC string.
+ */
+export function fromWIBDateTimeInput(localString?: string | null): string | undefined {
+  if (!localString) return undefined;
+  const clean = localString.trim();
+  if (!clean) return undefined;
+  const isoWithWIB = clean.length === 16 ? `${clean}:00+07:00` : clean;
+  const d = new Date(isoWithWIB);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
 // Helper to format bytes to human-readable size

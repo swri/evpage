@@ -211,7 +211,7 @@ export function SettingsTab({
         {/* Starts At */}
         <div>
           <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-            Waktu Pelaksanaan Event
+            Waktu Pelaksanaan Event (WIB)
           </label>
           <Input
             type="datetime-local"
@@ -224,7 +224,7 @@ export function SettingsTab({
         {/* Deadline */}
         <div>
           <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-            Batas Akhir Pendaftaran
+            Batas Akhir Pendaftaran (WIB)
           </label>
           <Input
             type="datetime-local"

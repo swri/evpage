@@ -15,6 +15,7 @@ import { resolveEventType } from '@/lib/event-types';
 import { refreshPublicPages } from '@/lib/public-refresh';
 import { saveEvent } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
+import { toWIBDateTimeInput, fromWIBDateTimeInput } from '@/lib/utils';
 import { useOrg } from '@/components/admin/org-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,10 +66,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
   const [location, setLocation] = useState(initialEvent?.location || '');
   const [locationUrl, setLocationUrl] = useState(initialEvent?.location_url || '');
   const [startsAt, setStartsAt] = useState(
-    initialEvent?.starts_at ? initialEvent.starts_at.slice(0, 16) : ''
+    initialEvent?.starts_at ? toWIBDateTimeInput(initialEvent.starts_at) : ''
   );
   const [deadline, setDeadline] = useState(
-    initialEvent?.registration_deadline ? initialEvent.registration_deadline.slice(0, 16) : ''
+    initialEvent?.registration_deadline ? toWIBDateTimeInput(initialEvent.registration_deadline) : ''
   );
   const [quota, setQuota] = useState<number>(initialEvent?.quota ?? 32);
   const [quotaMode, setQuotaMode] = useState<QuotaMode>(initialEvent?.quota_mode ?? 'registration');
@@ -288,8 +289,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         cover_url: coverUrl.trim(),
         location: location.trim(),
         location_url: locationUrl.trim() || null,
-        starts_at: startsAt ? new Date(startsAt).toISOString() : undefined,
-        registration_deadline: deadline ? new Date(deadline).toISOString() : undefined,
+        starts_at: fromWIBDateTimeInput(startsAt),
+        registration_deadline: fromWIBDateTimeInput(deadline),
         quota,
         quota_mode: quotaMode,
         waitlist_enabled: waitlistEnabled,
