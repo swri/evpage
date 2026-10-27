@@ -8,6 +8,7 @@ interface Toast {
   type: 'success' | 'error' | 'info';
   message: string;
   title?: string;
+  leaving?: boolean;
 }
 
 interface ToastContextType {
@@ -22,8 +23,10 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // Play the exit animation first, then drop it from the list
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 150);
   }, []);
 
   const toast = useCallback(
@@ -49,7 +52,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 rounded-lg border p-4 shadow-lg transition-all animate-in slide-in-from-bottom-5 ${
+            className={`pointer-events-auto flex items-start gap-3 rounded-lg border p-4 shadow-lg ${
+              t.leaving ? 'animate-out fade-out slide-out-to-bottom-2' : 'animate-in fade-in slide-in-from-bottom-5'
+            } ${
               t.type === 'success'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100'
                 : t.type === 'error'
@@ -68,7 +73,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
             <button
               onClick={() => removeToast(t.id)}
-              className="text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+              aria-label="Tutup notifikasi"
+              className="text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
             >
               <X className="h-4 w-4" />
             </button>

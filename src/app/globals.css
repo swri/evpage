@@ -95,3 +95,208 @@ body {
 .dark .notion-block:hover {
   background-color: rgba(255, 255, 255, 0.02);
 }
+
+/* ------------------------------------------------------------------
+ * Motion
+ * Durations are short on purpose: feedback should be visible, not slow.
+ * ------------------------------------------------------------------ */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-exit: 120ms;
+  --duration-enter: 220ms;
+}
+
+/* Interactive elements ease between hover/focus states instead of snapping.
+ * Base layer, so any transition-* utility on an element still wins. */
+@layer base {
+  a,
+  button,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  summary {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, box-shadow, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+
+  /* Tailwind v4 resets buttons to the default cursor */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
+/* Theme switch: colors change at once (see theme-toggle.tsx) */
+.theme-switching,
+.theme-switching * {
+  transition: none !important;
+}
+
+/* Enter/exit utilities (animate-in fade-in zoom-in-95 slide-in-from-*).
+ * Each modifier sets a variable; animate-in/animate-out play them. */
+@keyframes evp-enter {
+  from {
+    opacity: var(--evp-enter-opacity, 1);
+    transform: translate3d(var(--evp-enter-x, 0), var(--evp-enter-y, 0), 0) scale(var(--evp-enter-scale, 1))
+      rotate(var(--evp-enter-rotate, 0deg));
+  }
+}
+
+@keyframes evp-exit {
+  to {
+    opacity: var(--evp-exit-opacity, 1);
+    transform: translate3d(var(--evp-exit-x, 0), var(--evp-exit-y, 0), 0) scale(var(--evp-exit-scale, 1));
+  }
+}
+
+@utility animate-in {
+  animation: evp-enter var(--duration-enter) var(--ease-out) both;
+}
+@utility animate-out {
+  animation: evp-exit var(--duration-exit) ease-in both;
+}
+@utility fade-in {
+  --evp-enter-opacity: 0;
+}
+@utility fade-out {
+  --evp-exit-opacity: 0;
+}
+@utility zoom-in-95 {
+  --evp-enter-scale: 0.95;
+}
+@utility zoom-out-95 {
+  --evp-exit-scale: 0.95;
+}
+@utility spin-in-180 {
+  --evp-enter-rotate: -180deg;
+}
+@utility slide-in-from-top-2 {
+  --evp-enter-y: -0.5rem;
+}
+@utility slide-in-from-bottom-2 {
+  --evp-enter-y: 0.5rem;
+}
+@utility slide-in-from-bottom-3 {
+  --evp-enter-y: 0.75rem;
+}
+@utility slide-in-from-bottom-5 {
+  --evp-enter-y: 1.25rem;
+}
+@utility slide-in-from-right {
+  --evp-enter-x: 100%;
+}
+@utility slide-out-to-right {
+  --evp-exit-x: 100%;
+}
+@utility slide-out-to-top-2 {
+  --evp-exit-y: -0.5rem;
+}
+@utility slide-out-to-bottom-2 {
+  --evp-exit-y: 0.5rem;
+}
+
+/* Page transitions (React <ViewTransition>, see page-transition.tsx).
+ * The old page leaves fast; the new one arrives a little later so the two
+ * never fight for attention. */
+@keyframes evp-vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes evp-vt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+::view-transition-old(.page-exit) {
+  animation: evp-vt-fade-out var(--duration-exit) ease-in both;
+}
+::view-transition-new(.page-enter) {
+  animation: evp-vt-rise var(--duration-enter) var(--ease-out) 60ms both;
+}
+
+/* Clicks during the animation reach the live page instead of the overlay */
+::view-transition {
+  pointer-events: none;
+}
+
+/* Top progress bar while a navigation is in flight (navigation-progress.tsx).
+ * Hidden for the first 120ms so instant (prefetched) navigations don't flash. */
+@keyframes evp-progress {
+  0% {
+    transform: scaleX(0);
+  }
+  20% {
+    transform: scaleX(0.35);
+  }
+  60% {
+    transform: scaleX(0.7);
+  }
+  100% {
+    transform: scaleX(0.92);
+  }
+}
+@keyframes evp-show {
+  from {
+    opacity: 0;
+  }
+}
+
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 100;
+  height: 2px;
+  pointer-events: none;
+  transform-origin: left;
+  background: currentColor;
+  color: #18181b;
+}
+.dark .nav-progress {
+  color: #fafafa;
+}
+.nav-progress[data-state='loading'] {
+  animation:
+    evp-progress 8s cubic-bezier(0.1, 0.6, 0.3, 1) both,
+    evp-show 150ms ease-out 120ms both;
+}
+.nav-progress[data-state='done'] {
+  transform: scaleX(1);
+  opacity: 0;
+  transition:
+    transform 150ms ease-out,
+    opacity 200ms ease-out 150ms;
+}
+
+/* Button busy state (button.tsx): label fades out, spinner fades in.
+ * The short delay keeps instant actions (e.g. a cancelled confirm) from flickering. */
+@keyframes evp-hide {
+  to {
+    opacity: 0;
+  }
+}
+.btn-busy-label {
+  animation: evp-hide 120ms ease-out 100ms both;
+}
+.btn-busy-spinner {
+  animation: evp-show 120ms ease-out 100ms both;
+}
+
+/* Reduced motion: drop movement, keep spinners (they signal work in progress) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .animate-out {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

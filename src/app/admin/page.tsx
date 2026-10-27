@@ -129,7 +129,7 @@ export default function AdminDashboardPage() {
             <Users className="h-4 w-4" />
           </div>
           <div className="mt-2 text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            {loading ? '...' : totalRegistrations}
+            {loading ? '...' : <span className="inline-block animate-in fade-in">{totalRegistrations}</span>}
           </div>
           <p className="mt-1 text-[11px] text-neutral-400">
             Dari seluruh {events.length} event terdaftar
@@ -143,7 +143,7 @@ export default function AdminDashboardPage() {
             <CheckCircle2 className="h-4 w-4" />
           </div>
           <div className="mt-2 text-2xl font-bold tracking-tight text-emerald-950 dark:text-emerald-100">
-            {loading ? '...' : verifiedCount}
+            {loading ? '...' : <span className="inline-block animate-in fade-in">{verifiedCount}</span>}
           </div>
           <p className="mt-1 text-[11px] text-emerald-600/80 dark:text-emerald-400/80">
             Tiket resmi aktif dan sah
@@ -157,7 +157,7 @@ export default function AdminDashboardPage() {
             <Clock className="h-4 w-4" />
           </div>
           <div className="mt-2 text-2xl font-bold tracking-tight text-amber-950 dark:text-amber-100">
-            {loading ? '...' : pendingCount}
+            {loading ? '...' : <span className="inline-block animate-in fade-in">{pendingCount}</span>}
           </div>
           <p className="mt-1 text-[11px] text-amber-600/80 dark:text-amber-400/80">
             Perlu dicek bukti transfernya
@@ -171,7 +171,7 @@ export default function AdminDashboardPage() {
             <TrendingUp className="h-4 w-4" />
           </div>
           <div className="mt-2 text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            {loading ? '...' : formatRupiah(totalRevenue)}
+            {loading ? '...' : <span className="inline-block animate-in fade-in">{formatRupiah(totalRevenue)}</span>}
           </div>
           <p className="mt-1 text-[11px] text-neutral-400">
             Dana masuk yang telah diverifikasi
@@ -203,7 +203,7 @@ export default function AdminDashboardPage() {
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-neutral-300 p-8 text-center bg-white dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="rounded-xl border border-dashed border-neutral-300 p-8 text-center bg-white dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in">
             <Calendar className="mx-auto h-8 w-8 text-neutral-400 mb-2" />
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
               Belum ada event yang dibuat
@@ -218,7 +218,7 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
             {events.map((evt) => {
               const regCount = evt.total_registrations || 0;
               const quotaPercentage = evt.quota > 0 ? Math.min(100, (regCount / evt.quota) * 100) : 0;

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { canManageOrg, updateOrganization } from '@/lib/orgs';
 import { useOrg } from '@/components/admin/org-context';
 import { Button } from '@/components/ui/button';
+import { AdminPageSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast-context';
@@ -91,11 +92,7 @@ export default function AdminSettingsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white" />
-      </div>
-    );
+    return <AdminPageSkeleton cards={3} />;
   }
 
   if (!activeOrg) {

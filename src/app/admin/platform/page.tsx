@@ -21,6 +21,7 @@ import {
 } from '@/lib/cleanup';
 import { formatIndoDate } from '@/lib/store';
 import { refreshPublicPages } from '@/lib/public-refresh';
+import { AdminPageSkeleton } from '@/components/ui/skeleton';
 
 const card = 'rounded-xl border border-neutral-200/90 bg-white p-5 shadow-xs dark:border-neutral-800 dark:bg-neutral-900';
 
@@ -67,7 +68,7 @@ export default function PlatformPage() {
     }
   };
 
-  if (orgLoading) return null;
+  if (orgLoading) return <AdminPageSkeleton />;
   if (!isPlatformAdmin) {
     return (
       <div className="p-12 text-center text-sm text-neutral-500">
@@ -77,7 +78,7 @@ export default function PlatformPage() {
     );
   }
   if (!overview) {
-    return <div className="h-7 w-7 mx-auto mt-20 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white" />;
+    return <AdminPageSkeleton />;
   }
 
   const events = overview.events.filter((e) => !onlyFinished || e.finished);

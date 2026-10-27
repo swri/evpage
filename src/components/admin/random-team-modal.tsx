@@ -84,6 +84,8 @@ export function RandomTeamModal({
 
   // Generated state
   const [generatedTeams, setGeneratedTeams] = useState<GeneratedTeam[]>([]);
+  // Bumped on every new draw so the result cards replay their entrance
+  const [drawRound, setDrawRound] = useState(0);
   const [generatedMatchups, setGeneratedMatchups] = useState<TournamentMatchup[]>([]);
   const [copiedWA, setCopiedWA] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
@@ -136,6 +138,7 @@ export function RandomTeamModal({
           },
         });
         setGeneratedTeams(teams);
+        setDrawRound((n) => n + 1);
         setUsedSeed(seed);
         setSeedInput('');
         setManuallyAdjusted(false);
@@ -182,6 +185,7 @@ export function RandomTeamModal({
     setTimeout(() => {
       const matchups = generateTournamentDraw(teamsToDraw);
       setGeneratedMatchups(matchups);
+      setDrawRound((n) => n + 1);
       setIsShuffling(false);
       toast({
         type: 'success',
@@ -556,8 +560,13 @@ export function RandomTeamModal({
                   </p>
                 </div>
               ) : (
-                <div className={`grid gap-4 mt-4 grid-cols-1 md:grid-cols-2 ${generatedTeams.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
-                  {generatedTeams.map((team) => {
+                <div
+                  key={drawRound}
+                  className={`grid gap-4 mt-4 grid-cols-1 md:grid-cols-2 transition-opacity duration-200 ${generatedTeams.length >= 3 ? 'lg:grid-cols-3' : ''} ${
+                    isShuffling ? 'opacity-40' : ''
+                  }`}
+                >
+                  {generatedTeams.map((team, i) => {
                     const isSourceTeam = selectedPlayer?.teamId === team.id;
                     const spread = eventType.grouping.spreadFirst;
                     const gks = spread ? team.players.filter(spread) : [];
@@ -565,7 +574,8 @@ export function RandomTeamModal({
                     return (
                       <div
                         key={team.id}
-                        className="rounded-xl border border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-900 overflow-hidden shadow-xs flex flex-col"
+                        className="rounded-xl border border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-900 overflow-hidden shadow-xs flex flex-col animate-in fade-in zoom-in-95"
+                        style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
                       >
                         {/* Team Header */}
                         <div
@@ -709,11 +719,15 @@ export function RandomTeamModal({
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                  {generatedMatchups.map((m) => (
+                <div
+                  key={drawRound}
+                  className={`grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 transition-opacity duration-200 ${isShuffling ? 'opacity-40' : ''}`}
+                >
+                  {generatedMatchups.map((m, i) => (
                     <div
                       key={m.matchNumber}
-                      className="rounded-xl border border-neutral-200 bg-white p-4 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 flex flex-col justify-between"
+                      className="rounded-xl border border-neutral-200 bg-white p-4 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 flex flex-col justify-between animate-in fade-in zoom-in-95"
+                      style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
                     >
                       <div className="flex items-center justify-between text-xs text-neutral-400 pb-2 border-b border-neutral-100 dark:border-neutral-800">
                         <span className="font-semibold text-neutral-700 dark:text-neutral-300">

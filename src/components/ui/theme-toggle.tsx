@@ -39,15 +39,31 @@ export function ThemeToggle({ className }: { className?: string }) {
 
   const toggleTheme = () => {
     const root = document.documentElement;
-    const willBeDark = !root.classList.contains('dark');
-    if (willBeDark) {
-      root.classList.add('dark');
-      if (document.body) document.body.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+    const apply = () => {
+      const willBeDark = !root.classList.contains('dark');
+      if (willBeDark) {
+        root.classList.add('dark');
+        if (document.body) document.body.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        root.classList.remove('dark');
+        if (document.body) document.body.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+    };
+
+    // Per-element color transitions would make the switch ripple; the whole
+    // page cross-fades instead (where the View Transitions API exists)
+    root.classList.add('theme-switching');
+    const done = () =>
+      requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof document.startViewTransition === 'function' && !reduceMotion) {
+      document.startViewTransition(apply).finished.finally(done);
     } else {
-      root.classList.remove('dark');
-      if (document.body) document.body.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      apply();
+      done();
     }
   };
 

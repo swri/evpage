@@ -5,6 +5,7 @@ import { EventBuilder } from '@/components/admin/event-builder';
 import { getEventById } from '@/lib/store';
 import { EventItem } from '@/types';
 import { useOrg } from '@/components/admin/org-context';
+import { AdminPageSkeleton } from '@/components/ui/skeleton';
 
 function EditEventContent({
   params,
@@ -27,11 +28,7 @@ function EditEventContent({
   }, [id]);
 
   if (loading || orgLoading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white" />
-      </div>
-    );
+    return <AdminPageSkeleton />;
   }
 
   if (!event) {
@@ -51,7 +48,11 @@ function EditEventContent({
     );
   }
 
-  return <EventBuilder initialEvent={event} isEdit={true} />;
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-2">
+      <EventBuilder initialEvent={event} isEdit={true} />
+    </div>
+  );
 }
 
 export default function EditEventPage({
@@ -61,11 +62,7 @@ export default function EditEventPage({
 }) {
   return (
     <React.Suspense
-      fallback={
-        <div className="min-h-[50vh] flex items-center justify-center">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white" />
-        </div>
-      }
+      fallback={<AdminPageSkeleton />}
     >
       <EditEventContent params={params} />
     </React.Suspense>

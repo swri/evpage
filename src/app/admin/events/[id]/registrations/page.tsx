@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, use } from 'react';
+import React, { useState, useEffect, useMemo, useRef, use } from 'react';
 import Link from 'next/link';
 import {
   getEventById,
@@ -50,6 +50,9 @@ import { buildParticipantMessage } from '@/lib/notifications';
 import { StorageCleanupDialog } from '@/components/admin/storage-cleanup-dialog';
 import { refreshPublicPages } from '@/lib/public-refresh';
 import { RandomTeamModal } from '@/components/admin/random-team-modal';
+
+// A status badge mounts when the status changes, so this marks the update
+const BADGE_IN = 'animate-in fade-in zoom-in-95';
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
   pending: 'Menunggu',
@@ -108,13 +111,20 @@ function EventRegistrationsContent({
   // Random team & tournament draw modal
   const [randomTeamOpen, setRandomTeamOpen] = useState(false);
 
+  // Bumped by every optimistic change. A reload that started before it would
+  // overwrite the change with stale rows, so loadData drops that result.
+  const changeSeq = useRef(0);
+
+  // Initial load shows the skeleton; refreshes after an action update in place
   const loadData = async () => {
-    setLoading(true);
+    const seq = changeSeq.current;
     try {
       const [evt, regs] = await Promise.all([
         getEventById(eventId),
         getRegistrationsByEvent(eventId),
       ]);
+      // A newer change is in flight; its own reload follows
+      if (seq !== changeSeq.current) return;
       // Participant data is personal; only the event owner (or super admin) may see it
       if (evt && !canManageEvent(evt)) {
         setAccessDenied(true);
@@ -172,18 +182,35 @@ function EventRegistrationsContent({
     return { total, verified, pending, rejected, waitlisted, checkedIn, revenue };
   }, [registrations]);
 
+  /**
+   * Applies `patch` to the table immediately, then runs `action` on the server.
+   * The reload afterwards picks up server-side fields, and puts the rows back
+   * if the action failed (the caller's catch shows the error).
+   */
+  const applyChange = async (patch: (regs: Registration[]) => Registration[], action: () => Promise<unknown>) => {
+    changeSeq.current += 1;
+    setRegistrations(patch);
+    try {
+      await action();
+      // Slot counts on the public page changed
+      refreshPublicPages(event?.slug);
+    } finally {
+      void loadData();
+    }
+  };
+
+  const patchRows = (ids: string[], fields: Partial<Registration>) => (regs: Registration[]) =>
+    regs.map((r) => (ids.includes(r.id) ? { ...r, ...fields } : r));
+
   const handlePromote = async (id: string) => {
     try {
-      await promoteFromWaitlist(id);
+      await applyChange(patchRows([id], { status: 'pending' }), () => promoteFromWaitlist(id));
       // Their next WhatsApp message should say "a slot opened up"
       setPromotedIds((prev) => [...prev, id]);
       toast({
         type: 'success',
         message: 'Dipindahkan ke Menunggu Verifikasi. Kirim kabar via tombol WhatsApp pendaftar.',
       });
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
     } catch (err: unknown) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal memindahkan pendaftar' });
     }
@@ -191,11 +218,11 @@ function EventRegistrationsContent({
 
   const handleCheckIn = async (reg: Registration) => {
     try {
-      await setCheckIn(reg.id, !reg.checked_in_at, session?.user.id);
+      await applyChange(
+        patchRows([reg.id], { checked_in_at: reg.checked_in_at ? null : new Date().toISOString() }),
+        () => setCheckIn(reg.id, !reg.checked_in_at, session?.user.id)
+      );
       toast({ type: 'success', message: reg.checked_in_at ? 'Check-in dibatalkan.' : `${reg.contact_name} hadir.` });
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
     } catch (err: unknown) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal mencatat kehadiran' });
     }
@@ -204,14 +231,11 @@ function EventRegistrationsContent({
   // Quick Status Actions
   const handleVerify = async (id: string) => {
     try {
-      await updateRegistrationStatus(id, 'verified');
+      await applyChange(patchRows([id], { status: 'verified' }), () => updateRegistrationStatus(id, 'verified'));
       toast({
         type: 'success',
         message: 'Status pendaftaran berhasil diverifikasi!',
       });
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
       if (activeDetailReg?.id === id) {
         setActiveDetailReg((prev) => (prev ? { ...prev, status: 'verified' } : null));
       }
@@ -229,15 +253,15 @@ function EventRegistrationsContent({
   const submitReject = async () => {
     if (!rejectTargetId) return;
     try {
-      await updateRegistrationStatus(rejectTargetId, 'rejected', rejectNote);
+      await applyChange(
+        patchRows([rejectTargetId], { status: 'rejected', admin_note: rejectNote }),
+        () => updateRegistrationStatus(rejectTargetId, 'rejected', rejectNote)
+      );
       toast({
         type: 'info',
         message: 'Pendaftaran telah ditolak dengan catatan.',
       });
       setRejectModalOpen(false);
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
       if (activeDetailReg?.id === rejectTargetId) {
         setActiveDetailReg((prev) =>
           prev ? { ...prev, status: 'rejected', admin_note: rejectNote } : null
@@ -251,12 +275,9 @@ function EventRegistrationsContent({
   const handleDelete = async (id: string, code: string) => {
     if (!confirm(`Hapus pendaftaran ${code}? Tindakan ini permanen.`)) return;
     try {
-      await deleteRegistration(id);
+      await applyChange((regs) => regs.filter((r) => r.id !== id), () => deleteRegistration(id));
       toast({ type: 'info', message: `Pendaftaran ${code} telah dihapus.` });
       if (activeDetailReg?.id === id) setActiveDetailReg(null);
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -288,15 +309,14 @@ function EventRegistrationsContent({
   const handleBulkVerify = async () => {
     if (!confirm(`Verifikasi ${selectedIds.length} pendaftar yang dipilih?`)) return;
     try {
-      await updateSequentially(selectedIds, (id) => updateRegistrationStatus(id, 'verified'));
+      await applyChange(patchRows(selectedIds, { status: 'verified' }), () =>
+        updateSequentially(selectedIds, (id) => updateRegistrationStatus(id, 'verified'))
+      );
       toast({
         type: 'success',
         message: `${selectedIds.length} pendaftar berhasil diverifikasi!`,
       });
       setSelectedIds([]);
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -306,26 +326,29 @@ function EventRegistrationsContent({
     const note = prompt('Masukkan alasan penolakan untuk pendaftar terpilih:', 'Pembayaran tidak valid.');
     if (note === null) return;
     try {
-      await updateSequentially(selectedIds, (id) => updateRegistrationStatus(id, 'rejected', note));
+      await applyChange(patchRows(selectedIds, { status: 'rejected', admin_note: note }), () =>
+        updateSequentially(selectedIds, (id) => updateRegistrationStatus(id, 'rejected', note))
+      );
       toast({
         type: 'info',
         message: `${selectedIds.length} pendaftar ditolak.`,
       });
       setSelectedIds([]);
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
   };
 
   // Export to Excel (XLSX)
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
     if (registrations.length === 0) {
       toast({ type: 'info', message: 'Tidak ada data untuk diekspor.' });
       return;
     }
+
+    // Export runs synchronously and blocks the page; let the button's spinner
+    // (shown after 100ms, see button.tsx) appear first
+    await new Promise((resolve) => setTimeout(resolve, 120));
 
     const rows = registrations.map((r) => {
       const baseRow: Record<string, any> = {
@@ -376,11 +399,12 @@ function EventRegistrationsContent({
   };
 
   // Export to CSV
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (registrations.length === 0) {
       toast({ type: 'info', message: 'Tidak ada data untuk diekspor.' });
       return;
     }
+    await new Promise((resolve) => setTimeout(resolve, 120));
 
     const rows = registrations.map((r) => sanitizeCsvRow({
       'Kode': r.code,
@@ -426,7 +450,10 @@ function EventRegistrationsContent({
   const saveDrawerStatus = async () => {
     if (!activeDetailReg) return;
     try {
-      await updateRegistrationStatus(activeDetailReg.id, drawerStatus, drawerNote);
+      await applyChange(
+        patchRows([activeDetailReg.id], { status: drawerStatus, admin_note: drawerNote }),
+        () => updateRegistrationStatus(activeDetailReg.id, drawerStatus, drawerNote)
+      );
       toast({
         type: 'success',
         message: 'Status dan catatan berhasil diperbarui!',
@@ -434,9 +461,6 @@ function EventRegistrationsContent({
       setActiveDetailReg((prev) =>
         prev ? { ...prev, status: drawerStatus, admin_note: drawerNote } : null
       );
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -445,12 +469,20 @@ function EventRegistrationsContent({
   const saveEditData = async () => {
     if (!activeDetailReg) return;
     try {
-      await updateRegistrationData(
-        activeDetailReg.id,
-        activeDetailReg.answers,
-        editFormData.contact_name,
-        editFormData.contact_phone,
-        editFormData.contact_email
+      await applyChange(
+        patchRows([activeDetailReg.id], {
+          contact_name: editFormData.contact_name,
+          contact_phone: editFormData.contact_phone,
+          contact_email: editFormData.contact_email,
+        }),
+        () =>
+          updateRegistrationData(
+            activeDetailReg.id,
+            activeDetailReg.answers,
+            editFormData.contact_name,
+            editFormData.contact_phone,
+            editFormData.contact_email
+          )
       );
       toast({
         type: 'success',
@@ -467,9 +499,6 @@ function EventRegistrationsContent({
           : null
       );
       setEditMode(false);
-      loadData();
-      // Slot counts on the public page changed
-      refreshPublicPages(event?.slug);
     } catch (err: any) {
       toast({ type: 'error', message: err.message });
     }
@@ -840,19 +869,19 @@ function EventRegistrationsContent({
                       {/* Status Badge */}
                       <td className="p-3">
                         {reg.status === 'verified' && (
-                          <Badge variant="success">Terverifikasi</Badge>
+                          <Badge variant="success" className={BADGE_IN}>Terverifikasi</Badge>
                         )}
                         {reg.status === 'pending' && (
-                          <Badge variant="warning">Menunggu</Badge>
+                          <Badge variant="warning" className={BADGE_IN}>Menunggu</Badge>
                         )}
                         {reg.status === 'rejected' && (
-                          <Badge variant="destructive">Ditolak</Badge>
+                          <Badge variant="destructive" className={BADGE_IN}>Ditolak</Badge>
                         )}
                         {reg.status === 'waitlisted' && (
-                          <Badge variant="info">Daftar Tunggu</Badge>
+                          <Badge variant="info" className={BADGE_IN}>Daftar Tunggu</Badge>
                         )}
                         {reg.checked_in_at && (
-                          <Badge variant="secondary" className="mt-1">Hadir</Badge>
+                          <Badge variant="secondary" className={`mt-1 ${BADGE_IN}`}>Hadir</Badge>
                         )}
                       </td>
 

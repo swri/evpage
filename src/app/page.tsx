@@ -3,6 +3,9 @@ import { HomeClient } from './home-client';
 import { getCachedOpenEvents } from '@/lib/server/public-cache';
 import { isServerDataEnabled } from '@/lib/server/public-data';
 
+// Public pages must show their UI immediately on navigation (validated in dev)
+export const instant = true;
+
 const PLATFORM_SETTINGS = {
   name: 'EvPage',
   accent_color: '#171717',

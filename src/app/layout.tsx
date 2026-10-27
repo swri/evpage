@@ -1,7 +1,9 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/toast-context';
+import { NavigationProgress } from '@/components/ui/navigation-progress';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -47,7 +49,13 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-[#fafaf9] text-[#1c1917] dark:bg-[#09090b] dark:text-[#fafafa] selection:bg-neutral-800 selection:text-white dark:selection:bg-neutral-200 dark:selection:text-black">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          {/* Reads the URL, so it gets its own boundary to keep pages prerenderable */}
+          <Suspense fallback={null}>
+            <NavigationProgress />
+          </Suspense>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

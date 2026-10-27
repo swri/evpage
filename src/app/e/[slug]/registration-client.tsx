@@ -37,6 +37,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { RegistrationFormSkeleton } from '@/components/ui/skeleton';
 import { PROOF_ACCEPT, storePaymentProof, validateProofFile } from '@/lib/payment-proof';
 import { linkifyText, locationHref } from '@/lib/links';
 
@@ -89,6 +90,8 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // What the submit is doing right now, shown under the button
+  const [submitStep, setSubmitStep] = useState('');
 
   // Anti-spam Honeypot
   const [honeypot, setHoneypot] = useState('');
@@ -115,16 +118,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
     loadEventData();
   }, [slug, preloaded]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#09090b]">
-        <div className="space-y-4 text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white mx-auto" />
-          <p className="text-sm text-neutral-500">Memuat formulir pendaftaran...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <RegistrationFormSkeleton />;
 
   if (!event) {
     return (
@@ -288,17 +282,21 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
       const detectedEmail =
         (emailField && answers[emailField.id] ? String(answers[emailField.id]).trim() : '') || '-';
 
+      let paymentProofPath: string | undefined;
+      if (paymentProof && paymentProofFile) {
+        setSubmitStep('Mengunggah bukti pembayaran…');
+        // Uploaded to private storage in Supabase mode, inline data URL in demo mode
+        paymentProofPath = await storePaymentProof(event.id, paymentProofFile, paymentProof);
+      }
+
+      setSubmitStep('Menyimpan pendaftaran…');
       const newRegistration = await createRegistration({
         event_id: event.id,
         answers,
         contact_name: detectedName,
         contact_phone: detectedPhone,
         contact_email: detectedEmail,
-        // Uploaded to private storage in Supabase mode, inline data URL in demo mode
-        payment_proof_path:
-          paymentProof && paymentProofFile
-            ? await storePaymentProof(event.id, paymentProofFile, paymentProof)
-            : undefined,
+        payment_proof_path: paymentProofPath,
       });
 
       setCreatedRegistration(newRegistration);
@@ -327,6 +325,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
       });
     } finally {
       setIsSubmitting(false);
+      setSubmitStep('');
     }
   };
 
@@ -356,7 +355,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fafaf9] dark:bg-[#09090b]">
+    <div className={`min-h-screen flex flex-col bg-[#fafaf9] dark:bg-[#09090b] ${preloaded ? '' : 'animate-in fade-in'}`}>
       {/* Header with Monochrome EVP Logo */}
       <header className="sticky top-0 z-40 w-full border-b border-neutral-200/80 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-900/80">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
@@ -824,7 +823,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                       </div>
 
                       {errors.payment_proof && (
-                        <p className="text-xs text-red-600 mt-1">{errors.payment_proof}</p>
+                        <p className="text-xs text-red-600 mt-1 animate-in fade-in slide-in-from-top-2">{errors.payment_proof}</p>
                       )}
 
                       {/* Preview Box */}
@@ -864,9 +863,19 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                   >
                     Kirim Pendaftaran & Dapatkan Kode Tiket
                   </Button>
-                  <p className="text-center text-xs text-neutral-400 mt-3">
-                    Dengan mendaftar, Anda menyetujui seluruh ketentuan & regulasi yang berlaku pada event ini.
-                  </p>
+                  {isSubmitting && submitStep ? (
+                    <p
+                      key={submitStep}
+                      role="status"
+                      className="text-center text-xs font-medium text-neutral-600 dark:text-neutral-300 mt-3 animate-in fade-in slide-in-from-bottom-2"
+                    >
+                      {submitStep}
+                    </p>
+                  ) : (
+                    <p className="text-center text-xs text-neutral-400 mt-3">
+                      Dengan mendaftar, Anda menyetujui seluruh ketentuan & regulasi yang berlaku pada event ini.
+                    </p>
+                  )}
                 </div>
               </form>
             )}

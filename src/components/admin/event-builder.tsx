@@ -518,7 +518,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
 
       {/* TAB 1: UNIFIED FORM BUILDER EDITOR */}
       {activeTab === 'editor' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in">
           {/* Left Column: All Fields List & Reordering */}
           <div className="lg:col-span-5 space-y-4">
             <div className="flex items-center justify-between px-0.5">
@@ -1051,7 +1051,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
 
       {/* TAB 2: EVENT SETTINGS & PRICING */}
       {activeTab === 'settings' && (
-        <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 space-y-6">
+        <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 space-y-6 animate-in fade-in">
           <div className="border-b border-neutral-200 pb-3 dark:border-neutral-800">
             <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
               Informasi Umum & Konfigurasi Event
@@ -1408,7 +1408,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
 
       {/* TAB 3: LIVE PREVIEW */}
       {activeTab === 'preview' && (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-in fade-in">
           <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200 flex items-center justify-between">
             <span className="flex items-center gap-1.5 font-medium">
               <Eye className="h-4 w-4" />

@@ -1,11 +1,15 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { EventRegistrationClient } from './registration-client';
+import { RegistrationFormSkeleton } from '@/components/ui/skeleton';
 import { getCachedPublicEvent } from '@/lib/server/public-cache';
 import { isServerDataEnabled, previewDescription } from '@/lib/server/public-data';
 import { isValidSlug } from '@/lib/server/cache-tags';
 
 type Params = { params: Promise<{ slug: string }> };
+
+// Public pages must show their UI immediately on navigation (validated in dev)
+export const instant = true;
 
 /**
  * Link previews (WhatsApp, Facebook, X) read these tags. Next.js serves them
@@ -36,17 +40,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-function PageSpinner() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#fafaf9] dark:bg-[#09090b]">
-      <div className="space-y-4 text-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white mx-auto" />
-        <p className="text-sm text-neutral-500">Memuat formulir pendaftaran...</p>
-      </div>
-    </div>
-  );
-}
-
 // params are read inside the Suspense boundary so the App Shell can prerender
 async function EventContent({ params }: Params) {
   const { slug } = await params;
@@ -71,7 +64,7 @@ async function EventContent({ params }: Params) {
 
 export default function EventRegistrationPage({ params }: Params) {
   return (
-    <Suspense fallback={<PageSpinner />}>
+    <Suspense fallback={<RegistrationFormSkeleton />}>
       <EventContent params={params} />
     </Suspense>
   );

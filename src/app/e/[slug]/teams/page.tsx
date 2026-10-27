@@ -7,6 +7,9 @@ import { isValidSlug } from '@/lib/server/cache-tags';
 
 type Params = { params: Promise<{ slug: string }> };
 
+// Public pages must show their UI immediately on navigation (validated in dev)
+export const instant = true;
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   if (!isServerDataEnabled() || !isValidSlug(slug)) return { title: 'Pembagian Tim' };

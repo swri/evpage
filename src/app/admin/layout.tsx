@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { getCurrentAdminSession, logoutAdmin } from '@/lib/auth';
 import { OrgProvider, useOrg } from '@/components/admin/org-context';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
+import { startNavigationProgress } from '@/components/ui/navigation-progress';
+import { usePresence } from '@/components/ui/use-presence';
 import {
   LayoutDashboard,
   CalendarDays,
@@ -19,7 +21,15 @@ import {
   ChevronRight,
   Building2,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
+
+/** Small spinner at the end of a nav link while its page is loading. */
+function NavPendingHint() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return <Loader2 aria-hidden="true" className="ml-auto h-3.5 w-3.5 shrink-0 animate-spin text-neutral-400 btn-busy-spinner" />;
+}
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -36,6 +46,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
     const session = getCurrentAdminSession();
     if (!session) {
+      startNavigationProgress();
       router.push('/admin/login');
       return;
     }
@@ -70,9 +81,11 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   const { session, organizations, activeOrg, setActiveOrg, invitations, isPlatformAdmin } = useOrg();
   const adminUser = session?.user ?? null;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenu = usePresence(isMobileMenuOpen);
 
   const handleLogout = async () => {
     await logoutAdmin();
+    startNavigationProgress();
     router.push('/admin/login');
   };
 
@@ -114,7 +127,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="min-h-screen flex bg-[#fafaf9] dark:bg-[#09090b]">
+    <div className="min-h-screen flex bg-[#fafaf9] dark:bg-[#09090b] animate-in fade-in">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-neutral-200/90 bg-white dark:border-neutral-800 dark:bg-neutral-900 shrink-0">
         {/* Brand / Org Header with Monochrome EVP Logo */}
@@ -165,6 +178,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
               >
                 <Icon className={`h-4 w-4 shrink-0 ${item.active ? 'text-neutral-900 dark:text-white' : 'text-neutral-400'}`} />
                 <span>{item.label}</span>
+                <NavPendingHint />
               </Link>
             );
           })}
@@ -236,8 +250,12 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Mobile Menu Dropdown */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-b border-neutral-200 bg-white p-4 space-y-2 dark:border-neutral-800 dark:bg-neutral-900 animate-in slide-in-from-top-2">
+        {mobileMenu.mounted && (
+          <div
+            className={`md:hidden border-b border-neutral-200 bg-white p-4 space-y-2 dark:border-neutral-800 dark:bg-neutral-900 ${
+              mobileMenu.closing ? 'animate-out fade-out slide-out-to-top-2 pointer-events-none' : 'animate-in fade-in slide-in-from-top-2'
+            }`}
+          >
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -253,6 +271,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
                 >
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
+                  <NavPendingHint />
                 </Link>
               );
             })}
@@ -269,6 +288,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Content Area */}
+        {/* Sidebar and header stay put; page content transitions via template.tsx */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>

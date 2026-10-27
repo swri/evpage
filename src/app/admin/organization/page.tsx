@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Building2, Check, MailPlus, Trash2, UserMinus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AdminPageSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast-context';
@@ -94,11 +95,7 @@ export default function OrganizationPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-neutral-900 border-t-transparent dark:border-white" />
-      </div>
-    );
+    return <AdminPageSkeleton cards={3} />;
   }
 
   // Only roles that may manage draws form the approval quorum

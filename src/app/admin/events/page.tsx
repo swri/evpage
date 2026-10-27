@@ -29,8 +29,8 @@ export default function AdminEventsPage() {
   const [loading, setLoading] = useState(true);
   const [viewScope, setViewScope] = useState<'mine' | 'all'>('mine');
 
+  // Initial load shows the skeleton; refreshes after an action update in place
   const loadData = async () => {
-    setLoading(true);
     try {
       const evts = await getAllEvents();
       setAllEvents(evts);
@@ -61,7 +61,7 @@ export default function AdminEventsPage() {
         title: 'Event Berhasil Diduplikasi',
         message: `Salinan "${title}" telah dibuat dengan status Draft.`,
       });
-      loadData();
+      await loadData();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Gagal menduplikasi event';
       toast({
@@ -84,7 +84,7 @@ export default function AdminEventsPage() {
         type: 'info',
         message: `Event "${title}" berhasil dihapus.`,
       });
-      loadData();
+      await loadData();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Gagal menghapus event';
       toast({
@@ -155,7 +155,7 @@ export default function AdminEventsPage() {
           ))}
         </div>
       ) : events.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-neutral-300 p-12 text-center bg-white dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="rounded-xl border border-dashed border-neutral-300 p-12 text-center bg-white dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in">
           <CalendarDays className="mx-auto h-10 w-10 text-neutral-400 mb-3" />
           <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
             Belum Ada Event
@@ -170,7 +170,7 @@ export default function AdminEventsPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
           {events.map((evt) => (
             <div
               key={evt.id}

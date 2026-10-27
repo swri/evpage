@@ -318,7 +318,7 @@ export function HomeClient({
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-6">
+            <div className={`grid grid-cols-2 gap-3 sm:gap-6 ${preloaded ? '' : 'animate-in fade-in slide-in-from-bottom-2'}`}>
               {filteredEvents.map((event) => {
                 const isFree = event.price_type === 'free' || event.price_amount === 0;
                 const remainingQuota = remainingSlots(event);

@@ -1,10 +1,12 @@
+'use client';
+
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none active:scale-[0.98]',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none active:scale-[0.97] aria-busy:cursor-progress',
   {
     variants: {
       variant: {
@@ -41,17 +43,49 @@ export interface ButtonProps
   isLoading?: boolean;
 }
 
+/**
+ * Shows a spinner while `isLoading` is set, or while the Promise returned by
+ * `onClick` is pending (`onClick={() => handleSave()}` needs no extra state).
+ * A busy button keeps its size and ignores further clicks.
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, isLoading, children, disabled, ...props }, ref) => {
+  ({ className, variant, size, isLoading, children, disabled, onClick, ...props }, ref) => {
+    const [pending, setPending] = React.useState(false);
+    const busy = !!isLoading || pending;
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      // Also cancels implicit form submission (Enter in a field) while busy
+      if (busy) {
+        e.preventDefault();
+        return;
+      }
+      const result: unknown = onClick?.(e);
+      if (result instanceof Promise) {
+        setPending(true);
+        result.finally(() => setPending(false));
+      }
+    };
+
     return (
       <button
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, size, className }), busy && 'relative')}
         ref={ref}
-        disabled={disabled || isLoading}
+        disabled={disabled}
+        aria-busy={busy || undefined}
+        aria-disabled={busy || undefined}
+        onClick={handleClick}
         {...props}
       >
-        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-        {children}
+        {busy ? (
+          <>
+            <span className="btn-busy-label inline-flex items-center justify-center gap-[inherit]">{children}</span>
+            <span className="btn-busy-spinner absolute inset-0 flex items-center justify-center">
+              <Loader2 className={cn('animate-spin', size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+            </span>
+          </>
+        ) : (
+          children
+        )}
       </button>
     );
   }

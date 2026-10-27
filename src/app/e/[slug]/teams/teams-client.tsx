@@ -57,7 +57,7 @@ export function TeamsClient({ slug, preloaded, initialDraw }: { slug: string; pr
             <p className="mt-1 text-xs text-neutral-500">Panitia akan mempublikasikan hasil undian di halaman ini.</p>
           </div>
         ) : (
-          <>
+          <div className={`space-y-6 ${preloaded ? '' : 'animate-in fade-in slide-in-from-bottom-2'}`}>
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-50">
                 {draw.event_title}
@@ -97,7 +97,7 @@ export function TeamsClient({ slug, preloaded, initialDraw }: { slug: string; pr
                 </section>
               ))}
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>

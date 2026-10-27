@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { startNavigationProgress } from '@/components/ui/navigation-progress';
 import Link from 'next/link';
 import { loginAdmin, getCurrentAdminSession } from '@/lib/auth';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ export default function AdminLoginPage() {
     // If already logged in, redirect to dashboard
     const session = getCurrentAdminSession();
     if (session) {
+      startNavigationProgress();
       router.push(destination());
     }
   }, [router]);
@@ -49,14 +51,16 @@ export default function AdminLoginPage() {
           title: 'Login Berhasil',
           message: `Selamat datang kembali, ${res.session?.user.full_name || 'Admin'}!`,
         });
+        // Stays busy until the next page replaces this one
+        startNavigationProgress();
         router.push(destination());
       } else {
         setErrorMessage(res.error || 'Login gagal. Periksa kembali email dan password.');
+        setIsLoading(false);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Terjadi kesalahan sistem.';
       setErrorMessage(message);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -96,7 +100,7 @@ export default function AdminLoginPage() {
           </div>
 
           {errorMessage && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-700 border border-red-200 dark:bg-red-950/50 dark:border-red-900 dark:text-red-300">
+            <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-700 border border-red-200 dark:bg-red-950/50 dark:border-red-900 dark:text-red-300 animate-in fade-in slide-in-from-top-2">
               {errorMessage}
             </div>
           )}
