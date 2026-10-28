@@ -18,13 +18,13 @@ export function formatIcsDate(date: Date): string {
     .replace(/\.\d{3}/, '');
 }
 
-/** Escapes special characters according to RFC 5545 specifications */
+/** Escapes special characters according to RFC 5545 specifications and prevents CRLF injection */
 export function escapeIcsText(str: string): string {
   return str
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
+    .replace(/\r\n|\r|\n/g, '\\n');
 }
 
 /**
@@ -36,6 +36,8 @@ export function buildIcsContent(event: CalendarEventPayload): string {
   // Default duration: 2 hours
   const endDate = new Date(validStart.getTime() + 2 * 60 * 60 * 1000);
 
+  const safeUid = (event.id || 'evt-' + Date.now()).replace(/[^a-zA-Z0-9_-]/g, '');
+
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -43,7 +45,7 @@ export function buildIcsContent(event: CalendarEventPayload): string {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${event.id || 'evt-' + Date.now()}@evpage`,
+    `UID:${safeUid}@evpage`,
     `DTSTAMP:${formatIcsDate(new Date())}`,
     `DTSTART:${formatIcsDate(validStart)}`,
     `DTEND:${formatIcsDate(endDate)}`,

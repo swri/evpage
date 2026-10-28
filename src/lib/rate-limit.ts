@@ -46,15 +46,21 @@ function cleanupExpired(now: number) {
 
 /** Extracts the client IP from request headers */
 export function getClientIp(headers: Headers): string {
+  // 1. Cloudflare connecting IP (trustworthy behind Cloudflare proxy, cannot be spoofed by client)
+  const cfIp = headers.get('cf-connecting-ip');
+  if (cfIp?.trim()) return cfIp.trim();
+
+  // 2. X-Real-IP (reverse proxy)
+  const realIp = headers.get('x-real-ip');
+  if (realIp?.trim()) return realIp.trim();
+
+  // 3. X-Forwarded-For (client, proxy1, proxy2)
   const forwarded = headers.get('x-forwarded-for');
   if (forwarded) {
     const first = forwarded.split(',')[0]?.trim();
     if (first) return first;
   }
-  const realIp = headers.get('x-real-ip');
-  if (realIp?.trim()) return realIp.trim();
-  const cfIp = headers.get('cf-connecting-ip');
-  if (cfIp?.trim()) return cfIp.trim();
+
   return '127.0.0.1';
 }
 

@@ -11,7 +11,7 @@ beforeEach(() => {
   resetRateLimitStore();
 });
 
-test('getClientIp parses headers correctly with fallback', () => {
+test('getClientIp parses headers correctly with fallback and anti-spoofing priority', () => {
   const h1 = new Headers({ 'x-forwarded-for': '203.0.113.195, 70.41.3.18' });
   assert.equal(getClientIp(h1), '203.0.113.195');
 
@@ -20,6 +20,13 @@ test('getClientIp parses headers correctly with fallback', () => {
 
   const h3 = new Headers({ 'cf-connecting-ip': '192.0.2.1' });
   assert.equal(getClientIp(h3), '192.0.2.1');
+
+  // Anti-spoofing priority: trusted Cloudflare header overrides client-sent X-Forwarded-For
+  const hSpoofed = new Headers({
+    'cf-connecting-ip': '192.0.2.100',
+    'x-forwarded-for': '10.0.0.1, 10.0.0.2',
+  });
+  assert.equal(getClientIp(hSpoofed), '192.0.2.100');
 
   const h4 = new Headers({});
   assert.equal(getClientIp(h4), '127.0.0.1');
