@@ -136,3 +136,35 @@ test('deleting an organization cascades past the last-owner guard', async () => 
   await t.user(carol, 'DELETE FROM public.organizations WHERE id = $1', [orgB]);
   assert.equal((await t.sql('SELECT 1 FROM public.organization_members WHERE organization_id = $1', [orgB])).length, 0);
 });
+
+test('get_event_admin_stats isolates stats across organizations (B-01)', async () => {
+  // Alice & Bob belong to Org A (owners of eventA); Carol does not
+  const aliceStats = await t.user(alice, 'SELECT * FROM public.get_event_admin_stats(ARRAY[$1]::uuid[])', [eventA]);
+  assert.equal(aliceStats.length, 1, 'Alice (Org A member) can see eventA stats');
+
+  const carolStats = await t.user(carol, 'SELECT * FROM public.get_event_admin_stats(ARRAY[$1]::uuid[])', [eventA]);
+  assert.equal(carolStats.length, 0, 'Carol (outsider) cannot see eventA stats');
+
+  const rootStats = await t.user(root, 'SELECT * FROM public.get_event_admin_stats(ARRAY[$1]::uuid[])', [eventA]);
+  assert.equal(rootStats.length, 1, 'Platform admin can view any event stats');
+});
+
+test('form-attachments storage DELETE policy prevents cross-tenant deletion (B-03)', async () => {
+  await t.sql(`INSERT INTO storage.buckets (id, name, public) VALUES ('form-attachments', 'form-attachments', true) ON CONFLICT DO NOTHING`);
+  
+  // Alice uploads a file owned by Alice
+  const [fileObj] = await t.user<{ id: string }>(
+    alice,
+    `INSERT INTO storage.objects (bucket_id, name, owner) VALUES ('form-attachments', 'alice-banner.jpg', $1) RETURNING id`,
+    [alice]
+  );
+
+  // Carol (different org) attempts to delete Alice's file
+  const carolDeleted = await t.user(carol, `DELETE FROM storage.objects WHERE id = $1 RETURNING id`, [fileObj.id]);
+  assert.equal(carolDeleted.length, 0, 'Carol cannot delete a file owned by Alice in form-attachments');
+
+  // Alice can delete her own file
+  const aliceDeleted = await t.user(alice, `DELETE FROM storage.objects WHERE id = $1 RETURNING id`, [fileObj.id]);
+  assert.equal(aliceDeleted.length, 1, 'Alice can delete her own uploaded file');
+});
+

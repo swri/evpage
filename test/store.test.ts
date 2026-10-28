@@ -49,5 +49,5 @@ test('getOrganizationSettings returns organization settings object', async () =>
   const settings = await getOrganizationSettings();
   assert.ok(settings);
   assert.ok(settings.name);
-  assert.ok(settings.wa_number);
+  assert.equal(typeof settings.wa_number, 'string');
 });

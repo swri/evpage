@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   Printer,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 
 function StatusContent() {
   const searchParams = useSearchParams();
@@ -262,12 +263,34 @@ function DigitalTicketCard({
   phone: string;
   orgName?: string;
 }) {
+  const [qrImageUrl, setQrImageUrl] = useState<string>('');
+
   const qrData =
     typeof window !== 'undefined'
       ? `${window.location.origin}/status?code=${encodeURIComponent(registration.code)}&phone=${encodeURIComponent(phone)}`
       : registration.code;
 
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`;
+  useEffect(() => {
+    let active = true;
+    QRCode.toDataURL(qrData, {
+      width: 200,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#171717',
+        light: '#ffffff',
+      },
+    })
+      .then((url) => {
+        if (active) setQrImageUrl(url);
+      })
+      .catch((err) => {
+        logger.error('status-qr', 'Gagal membuat QR Code lokal:', err);
+      });
+    return () => {
+      active = false;
+    };
+  }, [qrData]);
 
   const handlePrint = () => {
     window.print();
@@ -293,13 +316,19 @@ function DigitalTicketCard({
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-5">
-        <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white border border-neutral-200 shadow-2xs dark:border-neutral-800 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrImageUrl}
-            alt={`QR Code ${registration.code}`}
-            className="h-32 w-32 object-contain"
-          />
+        <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-white border border-neutral-200 shadow-2xs dark:border-neutral-800 shrink-0 min-h-[140px] min-w-[140px]">
+          {qrImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={qrImageUrl}
+              alt={`QR Code ${registration.code}`}
+              className="h-32 w-32 object-contain"
+            />
+          ) : (
+            <div className="h-32 w-32 flex items-center justify-center text-[10px] text-neutral-400">
+              Membuat QR...
+            </div>
+          )}
           <span className="mt-1 font-mono text-[11px] font-bold text-neutral-800 tracking-wider">
             {registration.code}
           </span>

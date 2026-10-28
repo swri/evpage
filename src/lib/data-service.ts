@@ -326,7 +326,7 @@ export const INITIAL_ORGANIZATION_SETTINGS: OrganizationSettings = {
   name: 'Arena Sport & Event Center',
   logo_url: '/icon.svg',
   accent_color: '#0f172a',
-  wa_number: '6281234567890',
+  wa_number: '',
   payment_info: {
     bank_name: 'BCA',
     account_number: '8801239841',
