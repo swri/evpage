@@ -1,12 +1,14 @@
 'use client';
 
 import React from 'react';
-import { FormField, PriceType } from '@/types';
+import { FormField, PriceType, QuotaMode } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DynamicFormField } from '@/components/form/dynamic-form-field';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, fromWIBDateTimeInput } from '@/lib/utils';
 import { Eye } from 'lucide-react';
+import { EventInfoCards } from '@/components/event/event-info-cards';
+import { InfoCardId, DEFAULT_CARD_ORDER } from '@/lib/info-cards';
 
 interface PreviewTabProps {
   coverUrl: string;
@@ -16,6 +18,13 @@ interface PreviewTabProps {
   description?: string;
   organizerName: string;
   location: string;
+  locationUrl?: string;
+  startsAt?: string;
+  deadline?: string;
+  quota?: number | '';
+  quotaMode?: QuotaMode;
+  cardOrder?: InfoCardId[];
+  hiddenCards?: InfoCardId[];
   fields: FormField[];
   previewAnswers: Record<string, unknown>;
   setPreviewAnswers: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
@@ -30,6 +39,13 @@ export function PreviewTab({
   description,
   organizerName,
   location,
+  locationUrl,
+  startsAt,
+  deadline,
+  quota,
+  quotaMode,
+  cardOrder,
+  hiddenCards,
   fields,
   previewAnswers,
   setPreviewAnswers,
@@ -70,12 +86,26 @@ export function PreviewTab({
           <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-neutral-100">
             {title || 'Judul Event'}
           </h2>
-          {organizerName && (
-            <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 mt-1">
-              Penyelenggara: <strong>{organizerName}</strong>
-            </p>
-          )}
-          {location && <p className="text-xs text-neutral-500 mt-0.5">{location}</p>}
+
+          {/* Event Information Cards in Live Preview */}
+          <EventInfoCards
+            event={{
+              title: title || 'Judul Event',
+              organizer_name: organizerName,
+              location,
+              location_url: locationUrl,
+              starts_at: startsAt ? fromWIBDateTimeInput(startsAt) : undefined,
+              registration_deadline: deadline ? fromWIBDateTimeInput(deadline) : undefined,
+              quota: quota === '' ? 0 : Number(quota),
+              price_type: priceType,
+              price_amount: priceAmount === '' ? 0 : Number(priceAmount),
+            }}
+            cardOrder={cardOrder || DEFAULT_CARD_ORDER}
+            hiddenCards={hiddenCards || []}
+            remainingQuota={quota === '' || quota === 0 ? null : Number(quota)}
+            quotaUnit={quotaMode === 'participant' ? 'peserta' : 'slot'}
+            previewMode
+          />
         </div>
 
         {description && (

@@ -9,6 +9,8 @@ import { listEventTypes, resolveEventType } from '@/lib/event-types';
 import { formatRupiah } from '@/lib/utils';
 import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib/notifications';
 import { Building2, User, PenLine } from 'lucide-react';
+import { InfoCardId } from '@/lib/info-cards';
+import { CardOrderManager } from './card-order-manager';
 
 interface SettingsTabProps {
   title: string;
@@ -49,6 +51,10 @@ interface SettingsTabProps {
   setPriceAmount: (val: number | '') => void;
   prefixCode: string;
   setPrefixCode: (val: string) => void;
+  cardOrder: InfoCardId[];
+  setCardOrder: React.Dispatch<React.SetStateAction<InfoCardId[]>>;
+  hiddenCards: InfoCardId[];
+  setHiddenCards: React.Dispatch<React.SetStateAction<InfoCardId[]>>;
   waTemplate: string;
   setWaTemplate: (val: string) => void;
   notificationTemplates: Partial<Record<string, string>>;
@@ -96,6 +102,10 @@ export function SettingsTab({
   setPriceAmount,
   prefixCode,
   setPrefixCode,
+  cardOrder,
+  setCardOrder,
+  hiddenCards,
+  setHiddenCards,
   waTemplate,
   setWaTemplate,
   notificationTemplates,
@@ -532,6 +542,14 @@ export function SettingsTab({
             Contoh hasil: {prefixCode}-8X9Y2A
           </span>
         </div>
+
+        {/* Card Order & Visibility Manager */}
+        <CardOrderManager
+          cardOrder={cardOrder}
+          setCardOrder={setCardOrder}
+          hiddenCards={hiddenCards}
+          setHiddenCards={setHiddenCards}
+        />
 
         {/* WA Template */}
         <div className="md:col-span-2">

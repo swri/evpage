@@ -16,6 +16,7 @@ import { refreshPublicPages } from '@/lib/public-refresh';
 import { saveEvent } from '@/lib/store';
 import { getCurrentAdminSession } from '@/lib/auth';
 import { toWIBDateTimeInput, fromWIBDateTimeInput } from '@/lib/utils';
+import { InfoCardId, resolveCardOrder } from '@/lib/info-cards';
 import { useOrg } from '@/components/admin/org-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -111,6 +112,13 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
     initialEvent?.success_message ||
     'Terima kasih telah mendaftar! Mohon segera konfirmasi pembayaran melalui WhatsApp panitia.'
   );
+  const [cardOrder, setCardOrder] = useState<InfoCardId[]>(() =>
+    resolveCardOrder(initialEvent?.type_config as Record<string, unknown> | undefined)
+  );
+  const [hiddenCards, setHiddenCards] = useState<InfoCardId[]>(() => {
+    const raw = (initialEvent?.type_config as { hidden_cards?: unknown })?.hidden_cards;
+    return Array.isArray(raw) ? (raw as InfoCardId[]) : [];
+  });
 
   // Unified Form Fields State
   const [fields, setFields] = useState<FormField[]>(
@@ -315,6 +323,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         event_type: eventType,
         type_config: {
           ...(initialEvent?.type_config ?? {}),
+          card_order: cardOrder,
+          hidden_cards: hiddenCards,
           grouping: {
             ...((initialEvent?.type_config?.grouping as Record<string, unknown>) ?? {}),
             enabled: groupingEnabled,
@@ -537,6 +547,10 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
           setPriceAmount={setPriceAmount}
           prefixCode={prefixCode}
           setPrefixCode={setPrefixCode}
+          cardOrder={cardOrder}
+          setCardOrder={setCardOrder}
+          hiddenCards={hiddenCards}
+          setHiddenCards={setHiddenCards}
           waTemplate={waTemplate}
           setWaTemplate={setWaTemplate}
           notificationTemplates={notificationTemplates}
@@ -556,6 +570,13 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
           description={description}
           organizerName={organizerName}
           location={location}
+          locationUrl={locationUrl}
+          startsAt={startsAt}
+          deadline={deadline}
+          quota={quota}
+          quotaMode={quotaMode}
+          cardOrder={cardOrder}
+          hiddenCards={hiddenCards}
           fields={fields}
           previewAnswers={previewAnswers}
           setPreviewAnswers={setPreviewAnswers}

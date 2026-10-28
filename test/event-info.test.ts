@@ -86,3 +86,31 @@ test('QR code payload does NOT leak phone number or personal data', () => {
   assert.match(qrDataUrl, /\/status\?code=TIDDS20260004$/);
 });
 
+test('resolveCardOrder returns DEFAULT_CARD_ORDER on missing or empty config', async () => {
+  const { resolveCardOrder, DEFAULT_CARD_ORDER } = await import('../src/lib/info-cards.ts');
+  assert.deepEqual(resolveCardOrder(null), DEFAULT_CARD_ORDER);
+  assert.deepEqual(resolveCardOrder(undefined), DEFAULT_CARD_ORDER);
+  assert.deepEqual(resolveCardOrder({}), DEFAULT_CARD_ORDER);
+  assert.deepEqual(resolveCardOrder({ card_order: [] }), DEFAULT_CARD_ORDER);
+});
+
+test('resolveCardOrder preserves custom order and appends missing items', async () => {
+  const { resolveCardOrder } = await import('../src/lib/info-cards.ts');
+  const custom = ['time', 'location', 'quota'];
+  const resolved = resolveCardOrder({ card_order: custom });
+  assert.equal(resolved[0], 'time');
+  assert.equal(resolved[1], 'location');
+  assert.equal(resolved[2], 'quota');
+  assert.equal(resolved.includes('deadline'), true);
+  assert.equal(resolved.includes('organizer'), true);
+  assert.equal(resolved.includes('price'), true);
+  assert.equal(resolved.length, 6);
+});
+
+test('isCardVisible checks hidden_cards array in type_config', async () => {
+  const { isCardVisible } = await import('../src/lib/info-cards.ts');
+  assert.equal(isCardVisible('quota', null), true);
+  assert.equal(isCardVisible('quota', { hidden_cards: ['quota'] }), false);
+  assert.equal(isCardVisible('price', { hidden_cards: ['quota'] }), true);
+});
+

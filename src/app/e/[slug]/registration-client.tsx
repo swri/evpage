@@ -14,14 +14,12 @@ import {
   formatRupiah,
   formatIndoDate,
   formatTicketCode,
-  formatEventDateTime,
-  formatDeadlineDateTime,
-  getDeadlineCountdown,
 } from '@/lib/utils';
-import { downloadEventIcs } from '@/lib/calendar';
 import { downloadTicketImage } from '@/lib/ticket-canvas';
 import { logger } from '@/lib/logger';
 import { EventItem, OrganizationSettings, Registration } from '@/types';
+import { EventInfoCards } from '@/components/event/event-info-cards';
+import { resolveCardOrder, InfoCardId } from '@/lib/info-cards';
 import { DynamicFormField } from '@/components/form/dynamic-form-field';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,11 +28,6 @@ import { AppLogo } from '@/components/ui/app-logo';
 import { EventBannerImage } from '@/components/ui/event-banner-image';
 import { useToast } from '@/components/ui/toast-context';
 import {
-  Calendar,
-  Building2,
-  MapPin,
-  Users,
-  Clock,
   ArrowLeft,
   CheckCircle2,
   Copy,
@@ -48,12 +41,11 @@ import {
   Search,
   ExternalLink,
   Download,
-  CalendarPlus,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { RegistrationFormSkeleton } from '@/components/ui/skeleton';
 import { PROOF_ACCEPT, storePaymentProof, validateProofFile, deletePaymentProof } from '@/lib/payment-proof';
-import { linkifyText, locationHref } from '@/lib/links';
+import { linkifyText } from '@/lib/links';
 
 /** Empty answers matching the form schema (repeaters start with their minimum rows). */
 function initialAnswersFor(evt: EventItem | null): Record<string, unknown> {
@@ -113,7 +105,6 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
   // Success State
   const [createdRegistration, setCreatedRegistration] = useState<Registration | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedAddress, setCopiedAddress] = useState(false);
   const [copiedAccNumber, setCopiedAccNumber] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
   const [isDownloadingProof, setIsDownloadingProof] = useState(false);
@@ -374,18 +365,6 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
     toast({
       type: 'info',
       message: 'Kode pendaftaran berhasil disalin ke clipboard!',
-    });
-  };
-
-  // Copy event address
-  const handleCopyAddress = () => {
-    if (!event?.location) return;
-    navigator.clipboard.writeText(event.location);
-    setCopiedAddress(true);
-    setTimeout(() => setCopiedAddress(false), 2000);
-    toast({
-      type: 'info',
-      message: 'Alamat pertandingan berhasil disalin!',
     });
   };
 
@@ -706,187 +685,15 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
               </h1>
 
               {/* Event Information Cards Grid */}
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* 1. Lokasi Pertandingan (Full width on sm) */}
-                {event.location && (
-                  <div className="sm:col-span-2 rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60 transition-all">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
-                      <MapPin className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
-                      <span>Lokasi Pertandingan</span>
-                    </div>
-                    <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-snug break-words">
-                      {event.location}
-                    </div>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyAddress}
-                        className="h-7 text-xs gap-1.5 px-2.5 bg-white dark:bg-neutral-800 cursor-pointer"
-                      >
-                        {copiedAddress ? (
-                          <>
-                            <Check className="h-3 w-3 text-emerald-600" />
-                            <span>Alamat Tersalin</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            <span>Salin Alamat</span>
-                          </>
-                        )}
-                      </Button>
-                      {event.location && (
-                        <a
-                          href={locationHref(event.location, event.location_url) ?? '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 transition-colors"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          <span>Buka di Maps</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. Waktu Bermain */}
-                {event.starts_at && (
-                  <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
-                        <span>Waktu Bermain</span>
-                      </div>
-                      <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
-                        {formatEventDateTime(event.starts_at)}
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadEventIcs(event)}
-                        className="h-7 text-xs gap-1.5 px-2.5 bg-white dark:bg-neutral-800 cursor-pointer w-full sm:w-auto"
-                      >
-                        <CalendarPlus className="h-3 w-3" />
-                        <span>Tambah ke Kalender (.ics)</span>
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Batas Akhir Pendaftaran */}
-                {event.registration_deadline && (() => {
-                  const deadlineCountdown = getDeadlineCountdown(event.registration_deadline);
-                  return (
-                    <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between gap-1 mb-1.5">
-                          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                            <Clock className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
-                            <span>Batas Akhir Pendaftaran</span>
-                          </div>
-                          {deadlineCountdown.label && (
-                            <span
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                deadlineCountdown.isPassed
-                                  ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
-                                  : (deadlineCountdown.daysLeft ?? 99) <= 2
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                              }`}
-                            >
-                              {deadlineCountdown.label}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
-                          {formatDeadlineDateTime(event.registration_deadline)}
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-2 border-t border-neutral-200/60 dark:border-neutral-800 text-[11px] text-neutral-500">
-                        {deadlineCountdown.isPassed
-                          ? 'Waktu pendaftaran untuk acara ini telah ditutup.'
-                          : 'Pastikan mendaftar sebelum batas waktu berakhir.'}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* 4. Penyelenggara */}
-                {event.organizer_name && (
-                  <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
-                      <Building2 className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
-                      <span>Penyelenggara</span>
-                    </div>
-                    <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
-                      {event.organizer_name}
-                    </div>
-                    <div className="mt-2 text-[11px] text-neutral-500">
-                      Diselenggarakan resmi oleh pihak {event.organizer_name}
-                    </div>
-                  </div>
-                )}
-
-                {/* 5. Sisa Kuota */}
-                <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
-                  <div className="flex items-center justify-between gap-1 mb-1.5">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                      <Users className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
-                      <span>Sisa Kuota</span>
-                    </div>
-                    {isQuotaFull && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300">
-                        {joinsWaitlist ? 'Daftar Tunggu' : 'Penuh'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
-                    {remainingQuota === null ? (
-                      'Kuota tidak dibatasi'
-                    ) : (
-                      <>
-                        {remainingQuota} {quotaUnit}{' '}
-                        <span className="text-xs font-normal text-neutral-500">
-                          (total kapasitas {event.quota})
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <div className="mt-2 text-[11px] text-neutral-500">
-                    {remainingQuota === null
-                      ? 'Pendaftaran terbuka tanpa batas peserta.'
-                      : isQuotaFull
-                      ? joinsWaitlist
-                        ? 'Kuota utama penuh, pendaftar baru masuk daftar tunggu.'
-                        : 'Seluruh kuota pendaftaran telah terisi penuh.'
-                      : `Tersisa ${remainingQuota} slot ${quotaUnit} yang masih tersedia.`}
-                  </div>
-                </div>
-
-                {/* 6. Biaya Pendaftaran */}
-                <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
-                    <CreditCard className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
-                    <span>Biaya Pendaftaran</span>
-                  </div>
-                  <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
-                    {event.price_type === 'free' ? 'Gratis' : formatRupiah(event.price_amount)}
-                  </div>
-                  <div className="mt-2 text-[11px] text-neutral-500">
-                    {event.price_type === 'free'
-                      ? 'Tidak dipungut biaya pendaftaran.'
-                      : event.price_type === 'per_participant'
-                      ? 'Biaya per satu peserta yang didaftarkan.'
-                      : 'Biaya per pendaftaran (satu tim / grup).'}
-                  </div>
-                </div>
-              </div>
+              <EventInfoCards
+                event={event}
+                cardOrder={resolveCardOrder(event.type_config)}
+                hiddenCards={((event.type_config as { hidden_cards?: unknown })?.hidden_cards as InfoCardId[]) || []}
+                remainingQuota={remainingQuota}
+                quotaUnit={quotaUnit}
+                isQuotaFull={isQuotaFull}
+                joinsWaitlist={joinsWaitlist}
+              />
 
               {/* Description (Markdown-like formatting) */}
               {event.description && (
