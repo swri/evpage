@@ -282,7 +282,7 @@ export default function AdminSettingsPage() {
             <span>Pratinjau Tampilan Rekening (Yang Dilihat Pendaftar)</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${qrisUrl.trim() ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900 text-xs space-y-1">
               <div className="font-semibold text-neutral-700 dark:text-neutral-300">
                 Transfer Bank Manual
@@ -301,23 +301,19 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900 flex flex-col items-center justify-center text-center text-xs">
-              <span className="font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
-                Scan QRIS
-              </span>
-              {qrisUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
+            {qrisUrl.trim() && (
+              <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900 flex flex-col items-center justify-center text-center text-xs">
+                <span className="font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
+                  Scan QRIS
+                </span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={qrisUrl}
+                  src={qrisUrl.trim()}
                   alt="QRIS Preview"
                   className="h-24 w-24 object-contain rounded border border-neutral-200 dark:border-neutral-700 p-1"
                 />
-              ) : (
-                <div className="h-24 w-24 rounded border border-dashed border-neutral-300 flex items-center justify-center text-neutral-400 text-[11px]">
-                  QRIS Panitia
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 

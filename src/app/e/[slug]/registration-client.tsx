@@ -1048,10 +1048,12 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
 
                     {/* Payment Instruction & Bank / QRIS */}
                     {(() => {
-                      const hasQris = Boolean(
-                        orgSettings?.payment_info?.qris_url &&
-                          orgSettings.payment_info.qris_url.trim().length > 0
-                      );
+                      const qris = orgSettings?.payment_info?.qris_url?.trim() || '';
+                      const hasQris =
+                        qris.length > 0 &&
+                        qris !== '-' &&
+                        qris !== 'null' &&
+                        qris !== 'undefined';
                       return (
                         <div
                           className={`grid gap-4 mb-6 ${
