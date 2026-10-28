@@ -35,6 +35,7 @@ function StatusContent() {
   const [result, setResult] = useState<RegistrationStatusResult | null>(null);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [orgSettings, setOrgSettings] = useState<OrganizationSettings | null>(null);
 
   const handleSearch = useCallback(async (targetCode: string, targetPhone: string) => {
@@ -42,11 +43,14 @@ function StatusContent() {
 
     setLoading(true);
     setSearched(true);
+    setErrorMessage(null);
     try {
       const res = await checkStatus(targetCode, targetPhone);
       setResult(res);
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('status', 'Error checking status:', err);
+      const msg = err instanceof Error ? err.message : 'Gagal memeriksa status pendaftaran';
+      setErrorMessage(msg);
       setResult(null);
     } finally {
       setLoading(false);
@@ -246,6 +250,16 @@ function StatusContent() {
                   </div>
                 )}
               </div>
+            </div>
+          ) : errorMessage ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/60 dark:bg-red-950/40">
+              <ShieldAlert className="mx-auto h-8 w-8 text-red-600 dark:text-red-400 mb-2" />
+              <h3 className="text-sm font-semibold text-red-900 dark:text-red-200">
+                Pemeriksaan Dibatasi
+              </h3>
+              <p className="mt-1 text-xs text-red-700 dark:text-red-300 max-w-sm mx-auto">
+                {errorMessage}
+              </p>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-neutral-300 p-8 text-center bg-white dark:border-neutral-700 dark:bg-neutral-900">

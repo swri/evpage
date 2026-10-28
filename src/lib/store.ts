@@ -765,7 +765,7 @@ export async function checkStatus(code: string, phone: string): Promise<Registra
       p_code: cleanCode,
       p_phone: phone,
     });
-    if (error) throw new Error('Gagal memeriksa status pendaftaran');
+    if (error) throw new Error(error.message || 'Gagal memeriksa status pendaftaran');
     const row = Array.isArray(data) ? data[0] : data;
     return (row as RegistrationStatusResult) || null;
   }
