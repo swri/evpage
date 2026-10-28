@@ -22,6 +22,7 @@ import { EventBannerImage } from '@/components/ui/event-banner-image';
 import { useToast } from '@/components/ui/toast-context';
 import {
   Calendar,
+  Building2,
   MapPin,
   Users,
   Clock,
@@ -573,6 +574,17 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
 
               {/* Event Metadata (Date, Location, Quota) */}
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-neutral-600 dark:text-neutral-400">
+                {event.organizer_name && (
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-neutral-500 shrink-0" />
+                    <span>
+                      Penyelenggara:{' '}
+                      <strong className="font-semibold text-neutral-800 dark:text-neutral-200">
+                        {event.organizer_name}
+                      </strong>
+                    </span>
+                  </div>
+                )}
                 {event.starts_at && (
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-neutral-500 shrink-0" />

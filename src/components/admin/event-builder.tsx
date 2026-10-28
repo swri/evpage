@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   FormField,
@@ -43,7 +43,11 @@ export interface EventBuilderProps {
 export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps) {
   const { toast } = useToast();
   const currentSession = getCurrentAdminSession();
-  const { activeOrg } = useOrg();
+  const { organizations, activeOrg } = useOrg();
+
+  const eventOrg = organizations.find((o) => o.id === initialEvent?.organization_id) || activeOrg;
+  const orgName = eventOrg?.name || activeOrg?.name || currentSession?.user?.organization_name || '';
+  const userName = currentSession?.user?.full_name || '';
 
   const [activeTab, setActiveTab] = useState<'editor' | 'settings' | 'preview'>('editor');
   const [isSaving, setIsSaving] = useState(false);
@@ -54,10 +58,24 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
   const [slug, setSlug] = useState(initialEvent?.slug || '');
   const [organizerName, setOrganizerName] = useState(
     initialEvent?.organizer_name ||
+    activeOrg?.name ||
     currentSession?.user?.organization_name ||
     currentSession?.user?.full_name ||
     'Panitia Resmi'
   );
+
+  // Set default organizer name when activeOrg loads for new events
+  useEffect(() => {
+    if (!initialEvent?.organizer_name && activeOrg?.name) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOrganizerName((prev) => {
+        if (!prev || prev === 'Panitia Resmi') {
+          return activeOrg.name;
+        }
+        return prev;
+      });
+    }
+  }, [activeOrg?.name, initialEvent?.organizer_name]);
   const [description, setDescription] = useState(initialEvent?.description || '');
   const [coverUrl, setCoverUrl] = useState(
     initialEvent?.cover_url ||
@@ -493,6 +511,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
           setSlug={setSlug}
           organizerName={organizerName}
           setOrganizerName={setOrganizerName}
+          orgName={orgName}
+          userName={userName}
           status={status}
           setStatus={setStatus}
           coverUrl={coverUrl}

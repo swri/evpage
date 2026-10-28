@@ -8,6 +8,7 @@ import { ImageUploadField } from '@/components/ui/image-upload-field';
 import { listEventTypes, resolveEventType } from '@/lib/event-types';
 import { formatRupiah } from '@/lib/utils';
 import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib/notifications';
+import { Building2, User, PenLine } from 'lucide-react';
 
 interface SettingsTabProps {
   title: string;
@@ -22,6 +23,8 @@ interface SettingsTabProps {
   setSlug: (val: string) => void;
   organizerName: string;
   setOrganizerName: (val: string) => void;
+  orgName?: string;
+  userName?: string;
   status: EventStatus;
   setStatus: (val: EventStatus) => void;
   coverUrl: string;
@@ -67,6 +70,8 @@ export function SettingsTab({
   setSlug,
   organizerName,
   setOrganizerName,
+  orgName,
+  userName,
   status,
   setStatus,
   coverUrl,
@@ -98,6 +103,12 @@ export function SettingsTab({
   successMessage,
   setSuccessMessage,
 }: SettingsTabProps) {
+  const orgNameClean = orgName?.trim() || '';
+  const userNameClean = userName?.trim() || '';
+  const currentClean = organizerName.trim();
+  const isOrgActive = Boolean(orgNameClean && currentClean === orgNameClean);
+  const isUserActive = Boolean(userNameClean && currentClean === userNameClean);
+  const isCustomActive = !isOrgActive && !isUserActive;
   return (
     <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 space-y-6 animate-in fade-in">
       <div className="border-b border-neutral-200 pb-3 dark:border-neutral-800">
@@ -186,23 +197,6 @@ export function SettingsTab({
           />
         </div>
 
-        {/* Organizer Name */}
-        <div>
-          <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-            Penyelenggara (Nama Akun Admin / Organisasi)
-          </label>
-          <Input
-            type="text"
-            value={organizerName}
-            onChange={(e) => setOrganizerName(e.target.value)}
-            placeholder="Contoh: Budi Santoso / Panitia Turnamen"
-            className="text-xs h-9"
-          />
-          <span className="text-[11px] text-neutral-400">
-            Ditampilkan di card event beranda utama sebagai nama akun penyelenggara.
-          </span>
-        </div>
-
         {/* Status Event */}
         <div>
           <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
@@ -217,6 +211,153 @@ export function SettingsTab({
             <option value="closed">Ditutup Sementara</option>
             <option value="archived">Diarsipkan (Selesai)</option>
           </select>
+        </div>
+
+        {/* Organizer Name Configuration */}
+        <div className="md:col-span-2 space-y-3 rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <label className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                <Building2 className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                Penyelenggara Event
+              </label>
+              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block mt-0.5">
+                Pilih identitas yang akan ditampilkan sebagai Penyelenggara di card event beranda dan halaman pendaftaran.
+              </span>
+            </div>
+            {/* Live Card Preview Badge */}
+            <div className="inline-flex items-center gap-1.5 text-[11px] bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 rounded-md shadow-2xs text-neutral-700 dark:text-neutral-300">
+              <span className="text-neutral-400">Tampil di Card:</span>
+              <strong className="font-semibold text-neutral-900 dark:text-neutral-100">
+                {organizerName.trim() || 'Panitia Resmi'}
+              </strong>
+            </div>
+          </div>
+
+          {/* Quick Option Cards (Organisasi vs Nama User vs Kustom) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Opsi 1: Nama Organisasi */}
+            <button
+              type="button"
+              onClick={() => {
+                if (orgNameClean) setOrganizerName(orgNameClean);
+              }}
+              disabled={!orgNameClean}
+              className={`flex flex-col items-start p-3 rounded-lg border text-left transition-all ${
+                isOrgActive
+                  ? 'border-neutral-900 bg-white ring-1 ring-neutral-900 shadow-xs dark:border-neutral-100 dark:bg-neutral-800 dark:ring-neutral-100'
+                  : 'border-neutral-200 bg-white/70 hover:bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-800/60 dark:hover:bg-neutral-800'
+              } ${!orgNameClean ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-neutral-500" />
+                  Nama Organisasi
+                </span>
+                {isOrgActive && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-950" />
+                )}
+              </div>
+              <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate w-full">
+                {orgNameClean || '(Belum ada organisasi)'}
+              </span>
+              <span className="text-[10px] text-neutral-400 mt-0.5">
+                Rekomendasi untuk event resmi
+              </span>
+            </button>
+
+            {/* Opsi 2: Nama User / Akun Admin */}
+            <button
+              type="button"
+              onClick={() => {
+                if (userNameClean) setOrganizerName(userNameClean);
+              }}
+              disabled={!userNameClean}
+              className={`flex flex-col items-start p-3 rounded-lg border text-left transition-all ${
+                isUserActive
+                  ? 'border-neutral-900 bg-white ring-1 ring-neutral-900 shadow-xs dark:border-neutral-100 dark:bg-neutral-800 dark:ring-neutral-100'
+                  : 'border-neutral-200 bg-white/70 hover:bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-800/60 dark:hover:bg-neutral-800'
+              } ${!userNameClean ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 text-neutral-500" />
+                  Nama Akun Admin
+                </span>
+                {isUserActive && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-950" />
+                )}
+              </div>
+              <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate w-full">
+                {userNameClean || '(Nama akun Anda)'}
+              </span>
+              <span className="text-[10px] text-neutral-400 mt-0.5">
+                Nama profil admin pembuat
+              </span>
+            </button>
+
+            {/* Opsi 3: Kustom / Manual */}
+            <button
+              type="button"
+              onClick={() => {
+                // Focus custom input or leave current value
+              }}
+              className={`flex flex-col items-start p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                isCustomActive
+                  ? 'border-neutral-900 bg-white ring-1 ring-neutral-900 shadow-xs dark:border-neutral-100 dark:bg-neutral-800 dark:ring-neutral-100'
+                  : 'border-neutral-200 bg-white/70 hover:bg-white hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-800/60 dark:hover:bg-neutral-800'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                  <PenLine className="h-3.5 w-3.5 text-neutral-500" />
+                  Kustom / Manual
+                </span>
+                {isCustomActive && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-950" />
+                )}
+              </div>
+              <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate w-full">
+                {isCustomActive ? organizerName || 'Kustom' : 'Ketik nama bebas...'}
+              </span>
+              <span className="text-[10px] text-neutral-400 mt-0.5">
+                Nama kustom atau kolaborasi
+              </span>
+            </button>
+          </div>
+
+          {/* Editable Input Field */}
+          <div className="pt-1">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                Teks Penyelenggara yang Digunakan:
+              </label>
+              <div className="flex items-center gap-1.5">
+                {isOrgActive && (
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-md font-medium">
+                    🏢 Menggunakan Nama Organisasi
+                  </span>
+                )}
+                {isUserActive && (
+                  <span className="text-[10px] text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-md font-medium">
+                    👤 Menggunakan Nama Akun Anda
+                  </span>
+                )}
+                {isCustomActive && (
+                  <span className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-md font-medium">
+                    ✏️ Menggunakan Teks Kustom
+                  </span>
+                )}
+              </div>
+            </div>
+            <Input
+              type="text"
+              value={organizerName}
+              onChange={(e) => setOrganizerName(e.target.value)}
+              placeholder="Contoh: TI DDS / Panitia Turnamen"
+              className="text-xs h-9 bg-white dark:bg-neutral-900"
+            />
+          </div>
         </div>
 
         {/* Banner Image */}
