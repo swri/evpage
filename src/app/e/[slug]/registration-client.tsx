@@ -14,6 +14,7 @@ import {
   formatRupiah,
   formatIndoDate,
   formatTicketCode,
+  formatEventDateTime,
 } from '@/lib/utils';
 import { downloadTicketImage } from '@/lib/ticket-canvas';
 import { logger } from '@/lib/logger';
