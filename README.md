@@ -254,16 +254,25 @@ Salin domain hasil deploy (misalnya `https://evpage.vercel.app` atau domain kust
 | `pnpm db:schema` | bangun ulang `supabase/schema.sql` |
 | `pnpm db:backup` | backup data database (JSON/CSV) & download file storage secara rekursif (`SUPABASE_SERVICE_ROLE_KEY` dibutuhkan) |
 | `pnpm db:clean-orphans` | bersihkan file bukti bayar yatim (tidak terikat registrasi & >1 jam) |
+| `pnpm db:migrate-base64` | migrasi lampiran Base64 lama di `answers` ke bucket `form-attachments` (default DRY-RUN) |
 
 ### Environment Variables untuk Backup & Operasional
 
-Untuk menjalankan `pnpm db:backup` atau `pnpm db:clean-orphans`:
+Untuk menjalankan `pnpm db:backup`, `pnpm db:clean-orphans`, atau `pnpm db:migrate-base64`:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi... (service_role secret dari Supabase Settings > API)
 ```
 > [!IMPORTANT]
-> `SUPABASE_SERVICE_ROLE_KEY` wajib digunakan untuk backup dan pembersihan file yatim agar operasi tidak dibatasi oleh Row-Level Security (RLS) Supabase yang dapat menyebabkan ekspor 0 baris atau kegagalan unduh bucket. Jangan pernah mengekspos kunci ini ke browser.
+> `SUPABASE_SERVICE_ROLE_KEY` wajib digunakan untuk backup, pembersihan file yatim, dan migrasi Base64 agar operasi tidak dibatasi oleh Row-Level Security (RLS) Supabase yang dapat menyebabkan ekspor 0 baris atau kegagalan unduh bucket. Jangan pernah mengekspos kunci ini ke browser.
+
+### Urutan Aman Migrasi Base64 ke Storage
+
+1. **Backup Data**: Jalankan `pnpm db:backup` untuk memastikan snapshot pendaftaran dan storage tersimpan aman.
+2. **Uji Coba (DRY-RUN)**: Jalankan `pnpm db:migrate-base64`. Skrip hanya membaca data dan menghitung jumlah baris yang akan dikonversi tanpa mengubah apa pun.
+3. **Tinjau Laporan**: Periksa ringkasan jumlah berkas yang valid (PNG, JPG, WEBP, PDF) serta daftar yang perlu ditinjau manual (misalnya file SVG yang sengaja tidak dimigrasi demi keamanan dari Stored XSS).
+4. **Eksekusi Migrasi**: Jika laporan dry-run sesuai, jalankan `pnpm db:migrate-base64 --apply`. Skrip akan otomatis menyimpan backup JSON nilai asli di folder `backups/` sebelum memperbarui database.
+5. **Verifikasi**: Buka `/admin/events/[id]/registrations` dan periksa drawer pendaftar untuk memastikan lampiran dapat dibuka dan diunduh dari Supabase Storage.
 
 ---
 

@@ -10,7 +10,8 @@
     "test": "node --experimental-strip-types --experimental-test-module-mocks --test test/*.test.ts",
     "db:schema": "node scripts/build-schema.mjs",
     "db:backup": "node scripts/backup-data.mjs",
-    "db:clean-orphans": "node scripts/cleanup-orphans.mjs"
+    "db:clean-orphans": "node scripts/cleanup-orphans.mjs",
+    "db:migrate-base64": "node scripts/migrate-base64-attachments.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
