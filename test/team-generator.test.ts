@@ -168,3 +168,37 @@ test('formatTournamentForWhatsApp produces formatted match schedule announcement
   assert.ok(message.includes('Piala Kemerdekaan'));
   assert.ok(message.includes('*Tim Harimau* vs *Tim Rajawali*'));
 });
+
+test('extractPlayersFromRegistrations extracts repeaters created from Event Builder (sub_name, sub_number, sub_position) (B-04)', () => {
+  const mockRegs: Registration[] = [
+    {
+      id: 'reg-builder-1',
+      event_id: 'evt-builder',
+      code: 'EVT-2026-0001',
+      total_amount: 500000,
+      status: 'verified',
+      contact_name: 'Kapten Tono',
+      contact_phone: '081234567890',
+      contact_email: 'tono@test.com',
+      created_at: new Date().toISOString(),
+      schema_snapshot: [],
+      answers: {
+        team_name: 'Bintang Timur FC',
+        field_repeater: [
+          { sub_name: 'Kiper Bambang', sub_number: 1, sub_position: 'GK' },
+          { sub_name: 'Gelandang Eko', sub_number: 8, sub_position: 'MF' },
+          { sub_name: 'Penyerang Ilham', sub_number: 11, sub_position: 'FW' },
+        ],
+      },
+    },
+  ];
+
+  const players = extractPlayersFromRegistrations(mockRegs);
+  assert.equal(players.length, 3);
+  assert.equal(players[0].name, 'Kiper Bambang');
+  assert.equal(players[0].backNumber, 1);
+  assert.equal(players[0].position, 'GK');
+  assert.equal(players[1].name, 'Gelandang Eko');
+  assert.equal(players[2].name, 'Penyerang Ilham');
+});
+

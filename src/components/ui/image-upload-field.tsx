@@ -17,7 +17,7 @@ interface ImageUploadFieldProps {
   disabled?: boolean;
 }
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function ImageUploadField({
   label,
@@ -43,7 +43,7 @@ export function ImageUploadField({
 
     // Validate mime type
     if (!ALLOWED_TYPES.includes(file.type)) {
-      setErrorMsg('Format file harus JPG, PNG, WEBP, atau SVG.');
+      setErrorMsg('Format file harus JPG, PNG, atau WEBP.');
       return;
     }
 
@@ -143,7 +143,7 @@ export function ImageUploadField({
                     Klik untuk memilih gambar
                   </span>
                   <span className="text-[11px] text-neutral-400">
-                    JPG, PNG, WEBP, atau SVG (maks. {maxSizeMB} MB)
+                    JPG, PNG, atau WEBP (maks. {maxSizeMB} MB)
                   </span>
                 </div>
               )}

@@ -85,9 +85,9 @@ export function shuffleArray<T>(items: T[], random: RandomFn = Math.random): T[]
 // ==========================================
 // Answer keys recognised in repeater rows. Mini soccer templates use the
 // Indonesian names; generic events usually use name/role.
-export const PLAYER_NAME_KEYS = ['player_name', 'nama_pemain', 'name', 'nama'];
-export const PLAYER_ROLE_KEYS = ['position', 'posisi', 'role'];
-export const PLAYER_NUMBER_KEYS = ['back_number', 'no_punggung'];
+export const PLAYER_NAME_KEYS = ['player_name', 'nama_pemain', 'name', 'nama', 'sub_name'];
+export const PLAYER_ROLE_KEYS = ['position', 'posisi', 'role', 'sub_position'];
+export const PLAYER_NUMBER_KEYS = ['back_number', 'no_punggung', 'sub_number'];
 export const GROUP_ORIGIN_KEYS = ['team_name', 'nama_tim'];
 /** Numeric skill rating used by balanceLevel (e.g. 1-5) */
 export const PLAYER_LEVEL_KEYS = ['level', 'skill', 'rating', 'tingkat'];

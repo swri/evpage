@@ -417,7 +417,20 @@ function FileInputField({
     }
   };
 
-  const fileData = typeof value === 'object' && value !== null ? value : null;
+  const fileData = React.useMemo(() => {
+    if (typeof value === 'object' && value !== null) {
+      return value as { name?: string; size?: number; type?: string; url?: string };
+    }
+    if (typeof value === 'string' && value.trim()) {
+      const isImg = value.startsWith('data:image') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(value);
+      return {
+        name: isImg ? 'Gambar Terunggah' : 'Berkas Terunggah',
+        url: value,
+        type: isImg ? 'image/jpeg' : 'application/octet-stream',
+      };
+    }
+    return null;
+  }, [value]);
 
   return (
     <div className="space-y-3">

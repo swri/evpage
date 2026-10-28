@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PaymentProofPreview } from '@/components/admin/payment-proof-preview';
 import { formatIndoDate, formatRupiah } from '@/lib/utils';
-import { Save, MessageSquare, ExternalLink, Edit } from 'lucide-react';
+import { Save, MessageSquare, ExternalLink, Edit, FileText } from 'lucide-react';
 
 interface RegistrationDrawerProps {
   activeDetailReg: Registration | null;
@@ -298,6 +298,15 @@ export function RegistrationDrawer({
                 );
               }
 
+              if (field.type === 'file') {
+                return (
+                  <div key={field.id} className="text-xs">
+                    <span className="text-neutral-400">{field.label}:</span>
+                    <RenderFileAnswer answer={answer} />
+                  </div>
+                );
+              }
+
               return (
                 <div key={field.id} className="text-xs">
                   <span className="text-neutral-400">{field.label}:</span>
@@ -315,5 +324,73 @@ export function RegistrationDrawer({
         </div>
       )}
     </Sheet>
+  );
+}
+
+function RenderFileAnswer({ answer }: { answer: unknown }) {
+  if (!answer) return <div className="mt-0.5 text-neutral-400 font-semibold">-</div>;
+
+  let url: string | null = null;
+  let name = 'Berkas Terunggah';
+  let isImage = false;
+
+  if (typeof answer === 'object' && answer !== null) {
+    const fileObj = answer as { name?: string; url?: string; type?: string };
+    url = fileObj.url || null;
+    name = fileObj.name || 'Berkas Terunggah';
+    isImage = !!(
+      fileObj.type?.startsWith('image/') ||
+      (url && (url.startsWith('data:image') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(url)))
+    );
+  } else if (typeof answer === 'string' && answer.trim()) {
+    const str = answer.trim();
+    if (str.startsWith('data:image') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(str)) {
+      isImage = true;
+      url = str;
+      name = 'Foto / Gambar (Format Lama)';
+    } else if (str.startsWith('data:application/pdf')) {
+      url = str;
+      name = 'Dokumen PDF (Format Lama)';
+    } else if (str.startsWith('http://') || str.startsWith('https://')) {
+      url = str;
+      name = 'Tautan Berkas';
+      isImage = /\.(jpg|jpeg|png|webp)($|\?)/i.test(str);
+    } else {
+      return <div className="mt-0.5 text-neutral-600 dark:text-neutral-300 font-mono text-[11px] truncate">{str}</div>;
+    }
+  }
+
+  if (!url) return <div className="mt-0.5 text-neutral-400 font-semibold">-</div>;
+
+  return (
+    <div className="mt-1 flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-2.5 dark:border-neutral-800 dark:bg-neutral-800/40">
+      {isImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={name}
+          className="h-12 w-12 rounded object-cover border border-neutral-200 dark:border-neutral-700 shrink-0"
+        />
+      ) : (
+        <FileText className="h-7 w-7 text-neutral-400 shrink-0" />
+      )}
+      <div className="overflow-hidden flex-1 min-w-0">
+        <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+          {name}
+        </div>
+        <div className="text-[11px] text-neutral-500">
+          {isImage ? 'Gambar / Foto' : 'Berkas Dokumen'}
+        </div>
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        download={url.startsWith('data:') ? name : undefined}
+        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline shrink-0 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40"
+      >
+        <span>Buka / Unduh</span>
+      </a>
+    </div>
   );
 }
