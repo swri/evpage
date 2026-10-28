@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, use } from 'react';
+import React, { useState, useEffect, useMemo, useRef, use, useCallback } from 'react';
 import Link from 'next/link';
 import {
   getEventById,
@@ -90,7 +90,7 @@ function EventRegistrationsContent({
   // Bumped by every optimistic change
   const changeSeq = useRef(0);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const seq = changeSeq.current;
     try {
       const [evt, regs] = await Promise.all([
@@ -111,12 +111,20 @@ function EventRegistrationsContent({
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, canManageEvent]);
 
   useEffect(() => {
     if (orgLoading) return;
-    loadData();
-  }, [eventId, orgLoading]);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void loadData();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, orgLoading, loadData]);
 
   // Filtered registrations
   const filteredRegistrations = useMemo(() => {
@@ -142,11 +150,17 @@ function EventRegistrationsContent({
   // Pagination states
   const [pageSize, setPageSize] = useState<number>(25);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [prevFilterState, setPrevFilterState] = useState({ searchQuery, statusFilter, pageSize });
 
   // Reset to page 1 whenever filter or search query changes
-  useEffect(() => {
+  if (
+    prevFilterState.searchQuery !== searchQuery ||
+    prevFilterState.statusFilter !== statusFilter ||
+    prevFilterState.pageSize !== pageSize
+  ) {
+    setPrevFilterState({ searchQuery, statusFilter, pageSize });
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, pageSize]);
+  }
 
   const totalPages = Math.max(1, Math.ceil(filteredRegistrations.length / pageSize));
   const paginatedRegistrations = useMemo(() => {

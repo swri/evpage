@@ -10,8 +10,8 @@ import { storeFormAttachment } from '@/lib/form-attachments';
 
 interface DynamicFormFieldProps {
   field: FormField;
-  value: any;
-  onChange: (value: any) => void;
+  value: unknown;
+  onChange: (value: unknown) => void;
   error?: string;
   disabled?: boolean;
   eventId?: string;
@@ -30,6 +30,7 @@ export function DynamicFormField({
 
   // File preview state helper
   const renderInput = () => {
+    const stringVal = typeof value === 'string' || typeof value === 'number' ? value : '';
     switch (type) {
       case 'text':
         return (
@@ -38,7 +39,7 @@ export function DynamicFormField({
             name={id}
             type="text"
             placeholder={placeholder}
-            value={value ?? ''}
+            value={stringVal}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             aria-invalid={!!error}
@@ -52,7 +53,7 @@ export function DynamicFormField({
             id={id}
             name={id}
             placeholder={placeholder}
-            value={value ?? ''}
+            value={stringVal}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             rows={3}
@@ -70,7 +71,7 @@ export function DynamicFormField({
             min={validation?.min}
             max={validation?.max}
             placeholder={placeholder}
-            value={value ?? ''}
+            value={stringVal}
             onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
             disabled={disabled}
             aria-invalid={!!error}
@@ -86,7 +87,7 @@ export function DynamicFormField({
             autoComplete="email"
             inputMode="email"
             placeholder={placeholder || 'contoh@email.com'}
-            value={value ?? ''}
+            value={stringVal}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             aria-invalid={!!error}
@@ -102,7 +103,7 @@ export function DynamicFormField({
             autoComplete="tel"
             inputMode="tel"
             placeholder={placeholder || '08xxxxxxxxxx'}
-            value={value ?? ''}
+            value={stringVal}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             aria-invalid={!!error}
@@ -115,7 +116,7 @@ export function DynamicFormField({
             id={id}
             name={id}
             type="date"
-            value={value ?? ''}
+            value={stringVal}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             aria-invalid={!!error}
@@ -128,7 +129,7 @@ export function DynamicFormField({
             <select
               id={id}
               name={id}
-              value={value ?? ''}
+              value={stringVal}
               onChange={(e) => onChange(e.target.value)}
               disabled={disabled}
               className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-900 focus-visible:border-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100 dark:focus-visible:ring-neutral-100"
@@ -226,13 +227,13 @@ export function DynamicFormField({
         );
 
       case 'repeater': {
-        const rows: any[] = Array.isArray(value) ? value : [];
+        const rows: Record<string, unknown>[] = Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
         const minRows = validation?.min ?? 1;
         const maxRows = validation?.max ?? 20;
 
         const addRow = () => {
           if (rows.length >= maxRows) return;
-          const newRow: Record<string, any> = {};
+          const newRow: Record<string, unknown> = {};
           subFields?.forEach((sf) => {
             newRow[sf.id] = '';
           });
@@ -244,7 +245,7 @@ export function DynamicFormField({
           onChange(rows.filter((_, idx) => idx !== index));
         };
 
-        const updateRowField = (rowIndex: number, fieldId: string, fieldValue: any) => {
+        const updateRowField = (rowIndex: number, fieldId: string, fieldValue: unknown) => {
           const updated = [...rows];
           updated[rowIndex] = {
             ...updated[rowIndex],
@@ -286,7 +287,7 @@ export function DynamicFormField({
                       </label>
                       {sf.type === 'select' ? (
                         <select
-                          value={row[sf.id] ?? ''}
+                          value={typeof row[sf.id] === 'string' || typeof row[sf.id] === 'number' ? (row[sf.id] as string | number) : ''}
                           onChange={(e) => updateRowField(index, sf.id, e.target.value)}
                           className="flex h-9 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                         >
@@ -301,7 +302,7 @@ export function DynamicFormField({
                         <input
                           type={sf.type === 'number' ? 'number' : 'text'}
                           placeholder={sf.placeholder}
-                          value={row[sf.id] ?? ''}
+                          value={typeof row[sf.id] === 'string' || typeof row[sf.id] === 'number' ? (row[sf.id] as string | number) : ''}
                           onChange={(e) =>
                             updateRowField(
                               index,
@@ -393,9 +394,9 @@ function FileInputField({
   eventId = 'form-uploads',
 }: {
   id: string;
-  value: any;
+  value: unknown;
   disabled?: boolean;
-  onChange: (val: any) => void;
+  onChange: (val: unknown) => void;
   eventId?: string;
 }) {
   const [isUploading, setIsUploading] = React.useState(false);

@@ -262,7 +262,7 @@ export function RegistrationTable({
                       <div className="font-medium text-neutral-800 dark:text-neutral-200 truncate">
                         {String(primaryAnswer)}
                       </div>
-                      {reg.answers?.players && Array.isArray(reg.answers.players) && (
+                      {Array.isArray(reg.answers?.players) && (
                         <div className="text-[11px] text-neutral-400">
                           {reg.answers.players.length} Pemain terdaftar
                         </div>

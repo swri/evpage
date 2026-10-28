@@ -80,16 +80,15 @@ export function inlineProofUrl(stored: string | undefined | null): string | null
 }
 
 /**
- * Removes an uploaded payment proof file from storage (used to rollback if registration creation fails).
+ * Client-side rollback for failed registrations.
+ * Note: Storage RLS intentionally denies DELETE access to anonymous clients to prevent
+ * unauthorized file deletion and race-condition attacks against concurrent in-flight uploads.
+ * Abandoned/orphaned uploads are safely purged on schedule via `pnpm db:clean-orphans`
+ * (which targets unlinked files older than 1 hour).
  */
-export async function deletePaymentProof(path: string | undefined | null): Promise<void> {
-  if (!path || path.startsWith('data:')) return;
-  const supabase = getSupabaseClient();
-  if (!supabase) return;
-  try {
-    await supabase.storage.from(PROOF_BUCKET).remove([path]);
-  } catch (err) {
-    console.warn('Gagal menghapus bukti pembayaran yatim:', err);
-  }
+export async function deletePaymentProof(_path?: string | null): Promise<void> {
+  // Intentionally no-op on client side for security; handled by scheduled housekeeping
+  void _path;
+  return;
 }
 

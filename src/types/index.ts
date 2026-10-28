@@ -39,7 +39,7 @@ export interface FormField {
   validation?: FormFieldValidation;
   options?: FieldOption[]; // For select, radio, checkbox
   subFields?: FormField[]; // For repeater
-  defaultValue?: any;
+  defaultValue?: unknown;
 }
 
 export type PriceType = 'free' | 'fixed' | 'per_participant';
@@ -136,7 +136,7 @@ export interface Registration {
   id: string;
   event_id: string;
   code: string;
-  answers: Record<string, any>;
+  answers: Record<string, unknown>;
   schema_snapshot: FormField[];
   total_amount: number;
   payment_proof_path?: string;

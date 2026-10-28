@@ -44,7 +44,20 @@ export default function AdminEventsPage() {
   };
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+    getAllEvents()
+      .then((evts) => {
+        if (!cancelled) setAllEvents(evts);
+      })
+      .catch((err) => {
+        logger.error('admin-events', 'Failed to load events:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const events = isSuperAdmin && viewScope === 'all'

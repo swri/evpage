@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
+import { EventBannerImage } from '@/components/ui/event-banner-image';
 import { useToast } from '@/components/ui/toast-context';
 import {
   Calendar,
@@ -84,7 +85,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
   const [loading, setLoading] = useState(!preloaded);
 
   // Form State
-  const [answers, setAnswers] = useState<Record<string, any>>(() => initialAnswersFor(initialEvent));
+  const [answers, setAnswers] = useState<Record<string, unknown>>(() => initialAnswersFor(initialEvent));
   const [paymentProof, setPaymentProof] = useState<string | null>(null);
   const [paymentProofName, setPaymentProofName] = useState<string>('');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
@@ -276,7 +277,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
 
       const detectedName =
         (nameField && answers[nameField.id] ? String(answers[nameField.id]).trim() : '') ||
-        Object.values(answers).find((v) => typeof v === 'string' && v.trim().length > 0) ||
+        Object.values(answers).find((v): v is string => typeof v === 'string' && v.trim().length > 0) ||
         'Pendaftar';
       const detectedPhone =
         (phoneField && answers[phoneField.id] ? String(answers[phoneField.id]).trim() : '') || '-';
@@ -538,12 +539,11 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
           <div className="space-y-8">
             {/* Cover Banner */}
             {event.cover_url && (
-              <div className="h-48 sm:h-64 w-full overflow-hidden rounded-2xl bg-neutral-100 dark:bg-neutral-800 shadow-sm border border-neutral-200/80 dark:border-neutral-800">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+              <div className="relative h-48 sm:h-64 w-full overflow-hidden rounded-2xl bg-neutral-100 dark:bg-neutral-800 shadow-sm border border-neutral-200/80 dark:border-neutral-800">
+                <EventBannerImage
                   src={event.cover_url}
                   alt={event.title}
-                  className="h-full w-full object-cover"
+                  priority
                 />
               </div>
             )}

@@ -252,8 +252,18 @@ Salin domain hasil deploy (misalnya `https://evpage.vercel.app` atau domain kust
 | `pnpm test` | semua test: logika aplikasi, cabang Supabase (klien tiruan), dan **seluruh migrasi + RLS di PGlite** |
 | `pnpm lint`, `npx tsc --noEmit` | lint & type check |
 | `pnpm db:schema` | bangun ulang `supabase/schema.sql` |
+| `pnpm db:backup` | backup data database (JSON/CSV) & download file storage secara rekursif (`SUPABASE_SERVICE_ROLE_KEY` dibutuhkan) |
+| `pnpm db:clean-orphans` | bersihkan file bukti bayar yatim (tidak terikat registrasi & >1 jam) |
 
-CI (`.github/workflows/ci.yml`) menjalankan lint, type check, test, dan build.
+### Environment Variables untuk Backup & Operasional
+
+Untuk menjalankan `pnpm db:backup` atau `pnpm db:clean-orphans`:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi... (service_role secret dari Supabase Settings > API)
+```
+> [!IMPORTANT]
+> `SUPABASE_SERVICE_ROLE_KEY` wajib digunakan untuk backup dan pembersihan file yatim agar operasi tidak dibatasi oleh Row-Level Security (RLS) Supabase yang dapat menyebabkan ekspor 0 baris atau kegagalan unduh bucket. Jangan pernah mengekspos kunci ini ke browser.
 
 ---
 

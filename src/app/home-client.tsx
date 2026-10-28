@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { AppLogo } from '@/components/ui/app-logo';
+import { EventBannerImage } from '@/components/ui/event-banner-image';
 
 /**
  * Landing page. Supabase mode: open events come from the server (preloaded);
@@ -334,11 +335,10 @@ export function HomeClient({
                       {/* Event Cover Image */}
                       {event.cover_url && (
                         <div className="relative h-28 sm:h-44 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <EventBannerImage
                             src={event.cover_url}
                             alt={event.title}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-102"
+                            className="transition-transform duration-300 group-hover:scale-102"
                           />
                           <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
                             <Badge variant="success" className="text-[10px] px-1.5 py-0.5 sm:text-xs sm:px-2.5 sm:py-0.5">Buka</Badge>

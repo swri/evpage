@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Automated backup script for EvPage
-// Exports registrations (JSON & CSV), events, and downloads storage bucket files.
-// Usage: node scripts/backup-data.mjs [--dir <output_dir>]
+// Exports registrations (JSON & CSV), events, and downloads storage bucket files recursively.
+// Usage: node scripts/backup-data.mjs [--demo]
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 // Load .env.local or .env if present
@@ -38,10 +38,8 @@ loadEnv();
 
 const root = join(import.meta.dirname, '..');
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const isDemoMode = process.argv.includes('--demo');
 
 function getTimestamp() {
   const now = new Date();
@@ -63,6 +61,34 @@ function toCsv(rows) {
   return [headerLine, ...lines].join('\n');
 }
 
+/** Recursively lists all files in a storage bucket */
+async function listAllBucketFiles(supabase, bucket, prefix = '') {
+  const { data: items, error } = await supabase.storage.from(bucket).list(prefix, {
+    limit: 1000,
+    sortBy: { column: 'name', order: 'asc' },
+  });
+
+  if (error) {
+    throw error;
+  }
+  if (!items || items.length === 0) return [];
+
+  const files = [];
+  for (const item of items) {
+    if (!item.name || item.name === '.emptyFolderPlaceholder') continue;
+    const fullPath = prefix ? `${prefix}/${item.name}` : item.name;
+
+    // In Supabase storage, folders have id === null (or no metadata/mimetype)
+    if (item.id === null) {
+      const nested = await listAllBucketFiles(supabase, bucket, fullPath);
+      files.push(...nested);
+    } else {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
 async function runBackup() {
   const timestamp = getTimestamp();
   const backupDirName = `backup-${timestamp}`;
@@ -71,8 +97,8 @@ async function runBackup() {
   mkdirSync(backupDir, { recursive: true });
   console.log(`[BACKUP] Initializing backup at: ${backupDir}`);
 
-  if (!supabaseUrl || !supabaseKey) {
-    console.warn('[BACKUP] No Supabase credentials detected (NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY).');
+  // Handle explicit demo mode or offline backup when no Supabase URL is given
+  if (!supabaseUrl || isDemoMode) {
     console.log('[BACKUP] Generating offline demo snapshot...');
 
     const demoRegistrations = [
@@ -98,22 +124,38 @@ async function runBackup() {
       storageBuckets: [],
     };
     writeFileSync(join(backupDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
-    console.log(`[BACKUP] Offline backup completed successfully in ${backupDir}`);
+    console.log(`[BACKUP] Offline demo backup completed successfully in ${backupDir}`);
     return;
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey, {
+  // Live Supabase backup requires SUPABASE_SERVICE_ROLE_KEY to bypass RLS
+  if (!serviceRoleKey) {
+    console.error('\n[BACKUP] ERROR: SUPABASE_SERVICE_ROLE_KEY is missing!');
+    console.error(
+      '[BACKUP] Cannot perform backup with anonymous or user keys because Supabase Row-Level Security (RLS)'
+    );
+    console.error(
+      '[BACKUP] will restrict access and silently export 0 rows or fail storage downloads.'
+    );
+    console.error(
+      '[BACKUP] Please set SUPABASE_SERVICE_ROLE_KEY in .env.local or your environment before running pnpm db:backup.\n'
+    );
+    process.exit(1);
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
 
-  console.log('[BACKUP] Connected to Supabase. Fetching registrations...');
+  console.log('[BACKUP] Connected to Supabase with service role. Fetching registrations...');
   const { data: registrations, error: regError } = await supabase
     .from('registrations')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (regError) {
-    console.error('[BACKUP] Error fetching registrations:', regError);
+    console.error('[BACKUP] Error fetching registrations:', regError.message);
+    process.exit(1);
   } else {
     const regList = registrations || [];
     writeFileSync(join(backupDir, 'registrations.json'), JSON.stringify(regList, null, 2));
@@ -128,54 +170,48 @@ async function runBackup() {
     .order('created_at', { ascending: false });
 
   if (evtError) {
-    console.error('[BACKUP] Error fetching events:', evtError);
+    console.error('[BACKUP] Error fetching events:', evtError.message);
+    process.exit(1);
   } else {
     const evtList = events || [];
     writeFileSync(join(backupDir, 'events.json'), JSON.stringify(evtList, null, 2));
     console.log(`[BACKUP] Saved ${evtList.length} events.`);
   }
 
-  // Backup Storage Buckets
+  // Backup Storage Buckets Recursively
   const buckets = ['payment-proofs', 'form-attachments'];
   const storageSummary = {};
 
   for (const bucket of buckets) {
-    console.log(`[BACKUP] Checking storage bucket: ${bucket}...`);
+    console.log(`[BACKUP] Recursively checking storage bucket: ${bucket}...`);
     try {
-      const { data: files, error: listError } = await supabase.storage.from(bucket).list('', {
-        limit: 1000,
-        sortBy: { column: 'name', order: 'asc' },
-      });
+      const filePaths = await listAllBucketFiles(supabase, bucket, '');
+      console.log(`[BACKUP] Found ${filePaths.length} file(s) in bucket ${bucket}.`);
 
-      if (listError) {
-        console.warn(`[BACKUP] Could not list bucket ${bucket} (may not exist or insufficient permissions):`, listError.message);
-        continue;
-      }
-
-      if (files && files.length > 0) {
+      if (filePaths.length > 0) {
         const bucketFolder = join(backupDir, 'storage', bucket);
-        mkdirSync(bucketFolder, { recursive: true });
         let downloadedCount = 0;
 
-        for (const file of files) {
-          if (!file.name || file.name === '.emptyFolderPlaceholder') continue;
-          const { data: blob, error: dlError } = await supabase.storage.from(bucket).download(file.name);
+        for (const filePath of filePaths) {
+          const { data: blob, error: dlError } = await supabase.storage.from(bucket).download(filePath);
           if (dlError) {
-            console.warn(`[BACKUP] Failed downloading ${bucket}/${file.name}:`, dlError.message);
+            console.warn(`[BACKUP] Failed downloading ${bucket}/${filePath}:`, dlError.message);
           } else if (blob) {
+            const localDest = join(bucketFolder, filePath);
+            mkdirSync(dirname(localDest), { recursive: true });
             const buffer = Buffer.from(await blob.arrayBuffer());
-            writeFileSync(join(bucketFolder, file.name), buffer);
+            writeFileSync(localDest, buffer);
             downloadedCount++;
           }
         }
         storageSummary[bucket] = downloadedCount;
-        console.log(`[BACKUP] Downloaded ${downloadedCount} files from ${bucket}.`);
+        console.log(`[BACKUP] Downloaded ${downloadedCount} file(s) from ${bucket}.`);
       } else {
         storageSummary[bucket] = 0;
         console.log(`[BACKUP] Bucket ${bucket} is empty.`);
       }
     } catch (bucketErr) {
-      console.warn(`[BACKUP] Error processing bucket ${bucket}:`, bucketErr);
+      console.warn(`[BACKUP] Error processing bucket ${bucket}:`, bucketErr.message || bucketErr);
     }
   }
 

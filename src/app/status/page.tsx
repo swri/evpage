@@ -54,10 +54,20 @@ function StatusContent() {
   }, []);
 
   useEffect(() => {
-    getOrganizationSettings().then(setOrgSettings);
+    let cancelled = false;
+    getOrganizationSettings().then((settings) => {
+      if (!cancelled) setOrgSettings(settings);
+    });
     if (initialCode && initialPhone) {
-      handleSearch(initialCode, initialPhone);
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          void handleSearch(initialCode, initialPhone);
+        }
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [initialCode, initialPhone, handleSearch]);
 
   const onSubmit = (e: React.FormEvent) => {

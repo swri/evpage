@@ -51,7 +51,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setAuthChecked(true);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) setAuthChecked(true);
+    });
 
     const unsubscribe = setupAuthListener(() => {
       startNavigationProgress();
@@ -59,6 +62,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      cancelled = true;
       unsubscribe();
     };
   }, [pathname, isAuthPage, router]);

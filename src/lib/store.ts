@@ -509,7 +509,7 @@ function assertFitsQuota(event: EventItem, eventRegs: Registration[], needed: nu
 
 export async function createRegistration(params: {
   event_id: string;
-  answers: Record<string, any>;
+  answers: Record<string, unknown>;
   contact_name: string;
   contact_phone: string;
   contact_email: string;
@@ -614,7 +614,7 @@ export async function updateRegistrationStatus(
 ): Promise<Registration> {
   const supabase = getSupabaseClient();
   if (supabase) {
-    const payload: Record<string, any> = { status };
+    const payload: Record<string, unknown> = { status };
     if (admin_note !== undefined) payload.admin_note = admin_note;
     if (status === 'verified') payload.verified_at = new Date().toISOString();
     const { data, error } = await supabase
@@ -700,7 +700,7 @@ export async function setCheckIn(id: string, checkedIn: boolean, userId?: string
 
 export async function updateRegistrationData(
   id: string,
-  answers: Record<string, any>,
+  answers: Record<string, unknown>,
   contact_name: string,
   contact_phone: string,
   contact_email: string

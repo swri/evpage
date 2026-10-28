@@ -1,17 +1,45 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { loginRedirectPath, needsAuthCheck, supabaseEnv } from '@/lib/admin-guard';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /**
- * Optimistic auth check for the organizer area (Supabase mode only).
- * It refreshes the Supabase session cookie and redirects anonymous visitors
- * to the login page before any admin page renders. Data access itself is
- * still enforced by RLS; this only stops the admin shell from loading.
- * Demo mode keeps sessions in localStorage, which a proxy cannot read.
+ * Edge proxy & middleware:
+ * 1. IP rate limiting on public and sensitive routes (/status, /e/:path*, /admin/login)
+ *    to protect against ticket enumeration, quota exhaustion spam, and credential stuffing.
+ * 2. Optimistic auth check for the organizer area (Supabase mode only).
+ *    Refreshes session cookies and bounces anonymous visitors before admin pages render.
  */
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const ip = getClientIp(request.headers);
+
+  // 1. Rate limiting on sensitive endpoints
+  let rateRule: 'status' | 'registration' | 'auth' | null = null;
+  if (pathname.startsWith('/status')) {
+    rateRule = 'status';
+  } else if (pathname.startsWith('/e/')) {
+    rateRule = 'registration';
+  } else if (pathname === '/admin/login') {
+    rateRule = 'auth';
+  }
+
+  if (rateRule) {
+    const rate = checkRateLimit(ip, rateRule);
+    if (!rate.success) {
+      return new NextResponse('Terlalu banyak permintaan. Silakan coba lagi beberapa saat.', {
+        status: 429,
+        headers: {
+          'Retry-After': String(rate.resetSeconds),
+          'Content-Type': 'text/plain; charset=utf-8',
+        },
+      });
+    }
+  }
+
+  // 2. Admin auth check
   const env = supabaseEnv();
-  if (!env || !needsAuthCheck(request.nextUrl.pathname, env)) {
+  if (!env || !needsAuthCheck(pathname, env)) {
     return NextResponse.next();
   }
 
@@ -38,5 +66,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/status/:path*', '/status', '/e/:path*'],
 };
+
