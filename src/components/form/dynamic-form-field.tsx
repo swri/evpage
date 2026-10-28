@@ -132,7 +132,7 @@ export function DynamicFormField({
               value={stringVal}
               onChange={(e) => onChange(e.target.value)}
               disabled={disabled}
-              className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-900 focus-visible:border-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100 dark:focus-visible:ring-neutral-100"
+              className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-base sm:text-sm text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-900 focus-visible:border-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100 dark:focus-visible:ring-neutral-100"
               aria-invalid={!!error}
             >
               <option value="">{placeholder || '-- Pilih salah satu --'}</option>
@@ -289,7 +289,7 @@ export function DynamicFormField({
                         <select
                           value={typeof row[sf.id] === 'string' || typeof row[sf.id] === 'number' ? (row[sf.id] as string | number) : ''}
                           onChange={(e) => updateRowField(index, sf.id, e.target.value)}
-                          className="flex h-9 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                          className="flex h-9 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-base sm:text-xs text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                         >
                           <option value="">{sf.placeholder || '-- Pilih --'}</option>
                           {sf.options?.map((opt) => (
@@ -310,7 +310,7 @@ export function DynamicFormField({
                               sf.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value
                             )
                           }
-                          className="flex h-9 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-xs text-neutral-900 placeholder:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                          className="flex h-9 w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-base sm:text-xs text-neutral-900 placeholder:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
                         />
                       )}
                     </div>
