@@ -1,20 +1,132 @@
 -- Migration: 20261104000000_rate_limit_hardening_and_dos_mitigation.sql
 -- Description:
--- 1. Mitigate Ticket Status Lookup DoS:
+-- 1. Self-contained table and index provisioning (rpc_rate_limits & idx_registrations_normalized_code).
+-- 2. Mitigate Ticket Status Lookup DoS:
 --    Key failed status check attempts to (client_ip || ':' || clean_code) instead of code globally.
 --    This prevents malicious actors from locking legitimate participants out of checking their ticket.
--- 2. Revoke execute privileges on internal SECURITY DEFINER rate limiting helpers from PUBLIC/anon.
--- 3. Add opportunistic pruning to prevent unbounded growth of rpc_rate_limits.
--- 4. Increase IP registration rate limit from 30 to 100 per hour to accommodate shared campus/corporate NATs.
+-- 3. Revoke execute privileges on internal SECURITY DEFINER rate limiting helpers from PUBLIC/anon.
+-- 4. Add opportunistic pruning to prevent unbounded growth of rpc_rate_limits.
+-- 5. Increase IP registration rate limit from 30 to 100 per hour to accommodate shared campus/corporate NATs.
 
--- 1. Revoke execute privileges on internal rate limit helpers from public/anon/authenticated
-REVOKE ALL ON FUNCTION public.check_and_record_rate_limit(TEXT, TEXT, INT, INTERVAL, INTERVAL) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.is_rate_limited(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.reset_rate_limit(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.purge_expired_rate_limits() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.get_request_client_ip() FROM PUBLIC, anon, authenticated;
+-- 1. Ensure internal rate limits table exists with RLS enabled
+CREATE TABLE IF NOT EXISTS public.rpc_rate_limits (
+    key_hash TEXT PRIMARY KEY,
+    action TEXT NOT NULL,
+    attempts INT NOT NULL DEFAULT 1,
+    first_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    blocked_until TIMESTAMPTZ
+);
 
--- 2. Upgrade check_and_record_rate_limit with automatic opportunistic housekeeping
+ALTER TABLE public.rpc_rate_limits ENABLE ROW LEVEL SECURITY;
+-- No public policies! Denies all direct access to anon and authenticated users.
+
+-- 2. Ensure functional index for normalized ticket code lookup exists
+CREATE INDEX IF NOT EXISTS idx_registrations_normalized_code
+    ON public.registrations ((REPLACE(UPPER(code), '-', '')));
+
+-- 3. Helper to extract client IP from PostgREST headers (anti-spoofing order)
+CREATE OR REPLACE FUNCTION public.get_request_client_ip()
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+    v_headers JSONB;
+    v_ip TEXT;
+BEGIN
+    BEGIN
+        v_headers := NULLIF(current_setting('request.headers', true), '')::JSONB;
+    EXCEPTION WHEN OTHERS THEN
+        v_headers := NULL;
+    END;
+
+    IF v_headers IS NOT NULL THEN
+        -- 1. Cloudflare connecting IP (trustworthy behind Cloudflare proxy)
+        v_ip := TRIM(COALESCE(v_headers ->> 'cf-connecting-ip', ''));
+        IF v_ip <> '' THEN
+            RETURN v_ip;
+        END IF;
+
+        -- 2. X-Real-IP (reverse proxy)
+        v_ip := TRIM(COALESCE(v_headers ->> 'x-real-ip', ''));
+        IF v_ip <> '' THEN
+            RETURN v_ip;
+        END IF;
+
+        -- 3. X-Forwarded-For (client, proxy1, proxy2)
+        v_ip := TRIM(COALESCE(v_headers ->> 'x-forwarded-for', ''));
+        IF v_ip <> '' THEN
+            RETURN SPLIT_PART(v_ip, ',', 1);
+        END IF;
+    END IF;
+
+    RETURN '127.0.0.1';
+END;
+$$;
+
+-- 4. Purge old rate limit records (housekeeping)
+CREATE OR REPLACE FUNCTION public.purge_expired_rate_limits()
+RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_count INT;
+BEGIN
+    DELETE FROM public.rpc_rate_limits
+    WHERE (blocked_until IS NOT NULL AND blocked_until < NOW() - INTERVAL '1 day')
+       OR (blocked_until IS NULL AND last_attempt_at < NOW() - INTERVAL '1 day');
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END;
+$$;
+
+-- 5. Check if currently blocked without recording an attempt
+CREATE OR REPLACE FUNCTION public.is_rate_limited(
+    p_action TEXT,
+    p_identifier TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_hash TEXT := md5(p_action || ':' || LOWER(TRIM(p_identifier)));
+    v_blocked_until TIMESTAMPTZ;
+BEGIN
+    SELECT blocked_until INTO v_blocked_until
+    FROM public.rpc_rate_limits
+    WHERE key_hash = v_hash;
+
+    IF FOUND AND v_blocked_until IS NOT NULL AND v_blocked_until > NOW() THEN
+        RETURN TRUE;
+    END IF;
+    RETURN FALSE;
+END;
+$$;
+
+-- 6. Reset limit on success
+CREATE OR REPLACE FUNCTION public.reset_rate_limit(
+    p_action TEXT,
+    p_identifier TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_hash TEXT := md5(p_action || ':' || LOWER(TRIM(p_identifier)));
+BEGIN
+    DELETE FROM public.rpc_rate_limits WHERE key_hash = v_hash;
+END;
+$$;
+
+-- 7. Sliding-window rate limit checker with opportunistic housekeeping
 CREATE OR REPLACE FUNCTION public.check_and_record_rate_limit(
     p_action TEXT,
     p_identifier TEXT,
@@ -81,10 +193,15 @@ BEGIN
 END;
 $$;
 
--- Keep execute restricted to internal
+-- 8. Revoke execute privileges on all internal rate limit helpers from public/anon/authenticated
 REVOKE ALL ON FUNCTION public.check_and_record_rate_limit(TEXT, TEXT, INT, INTERVAL, INTERVAL) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.is_rate_limited(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.reset_rate_limit(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.purge_expired_rate_limits() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.get_request_client_ip() FROM PUBLIC, anon, authenticated;
 
--- 3. Upgrade check_registration_status with DoS protection
+-- 9. Upgrade check_registration_status with DoS protection
+-- Explicit DROP FUNCTION prevents ERROR 42P13 when return signatures differ
 DROP FUNCTION IF EXISTS public.check_registration_status(TEXT, TEXT);
 
 CREATE OR REPLACE FUNCTION public.check_registration_status(
@@ -177,7 +294,7 @@ BEGIN
 END;
 $$;
 
--- 4. Upgrade create_registration_atomic: increase IP threshold to 100/hr for shared corporate/campus networks
+-- 10. Upgrade create_registration_atomic: generate dashless codes and accommodate shared NATs (100/hr)
 CREATE OR REPLACE FUNCTION public.create_registration_atomic(
     p_event_id UUID,
     p_answers JSONB,
@@ -277,6 +394,6 @@ BEGIN
 END;
 $$;
 
--- 5. Explicitly grant execute ONLY to intended public entrypoints
+-- 11. Explicitly grant execute ONLY to intended public entrypoints
 GRANT EXECUTE ON FUNCTION public.check_registration_status(TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_registration_atomic(UUID, JSONB, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated;

@@ -181,6 +181,8 @@ END;
 $$;
 
 -- 7. Upgraded check_registration_status with strict brute-force & enumeration prevention
+DROP FUNCTION IF EXISTS public.check_registration_status(TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.check_registration_status(
     p_code TEXT,
     p_phone TEXT
