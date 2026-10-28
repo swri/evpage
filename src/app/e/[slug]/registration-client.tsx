@@ -448,11 +448,11 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
         {createdRegistration ? (
           <div className="space-y-8 animate-in fade-in duration-300">
             {/* Success Card */}
-            <div className="rounded-2xl border border-emerald-200/90 bg-white p-6 sm:p-8 shadow-sm dark:border-emerald-900/80 dark:bg-neutral-900">
+            <div className="rounded-2xl border border-emerald-200/90 bg-white p-4 sm:p-8 shadow-sm dark:border-emerald-900/80 dark:bg-neutral-900">
               <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="h-8 w-8 shrink-0" />
                 <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
                     Pendaftaran Berhasil Dikirim!
                   </h1>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
@@ -462,12 +462,14 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
               </div>
 
               {/* Code Box */}
-              <div className="mt-6 rounded-xl border border-neutral-200 bg-neutral-50/70 p-5 dark:border-neutral-800 dark:bg-neutral-800/40">
-                <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+              <div className="mt-5 rounded-2xl border border-neutral-200/90 bg-neutral-50/80 p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-850/60">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   Kode Pendaftaran Unik Anda
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-4">
-                  <div className="font-mono text-2xl font-extrabold tracking-wider text-neutral-900 dark:text-neutral-50">
+
+                {/* Code & Copy Button */}
+                <div className="mt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+                  <div className="font-mono text-xl sm:text-2xl font-extrabold tracking-wider text-neutral-900 dark:text-neutral-50 break-all select-all">
                     {formatTicketCode(createdRegistration.code)}
                   </div>
                   <Button
@@ -475,37 +477,45 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                     variant="outline"
                     size="sm"
                     onClick={handleCopyCode}
-                    className="h-8 text-xs gap-1.5"
+                    className="h-8 text-xs gap-1.5 shrink-0 self-start sm:self-auto bg-white hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 border-neutral-300 dark:border-neutral-700 cursor-pointer shadow-2xs active:scale-95"
                   >
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>{copiedCode ? 'Tersalin!' : 'Salin Kode'}</span>
+                    {copiedCode ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>Kode Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Salin Kode</span>
+                      </>
+                    )}
                   </Button>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  {createdRegistration.status === 'waitlisted' ? (
-                    <>
+
+                {/* Status Badge & Helper Text */}
+                <div className="mt-3.5 pt-3 border-t border-neutral-200/70 dark:border-neutral-700/60 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                  <div className="shrink-0">
+                    {createdRegistration.status === 'waitlisted' ? (
                       <Badge variant="info">Daftar Tunggu</Badge>
-                      <span className="text-xs text-neutral-500">
-                        Kuota sedang penuh. Panitia akan menghubungi Anda bila ada slot kosong; jangan transfer dulu.
-                      </span>
-                    </>
-                  ) : (
-                    <>
+                    ) : (
                       <Badge variant="warning">Menunggu Verifikasi</Badge>
-                      <span className="text-xs text-neutral-500">
-                        Panitia akan memeriksa pembayaran & berkas Anda
-                      </span>
-                    </>
-                  )}
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    {createdRegistration.status === 'waitlisted'
+                      ? 'Kuota sedang penuh. Panitia akan menghubungi Anda bila ada slot kosong; jangan transfer dulu.'
+                      : 'Panitia akan memeriksa pembayaran & berkas Anda'}
+                  </p>
                 </div>
 
                 {/* Important notice on tracking info */}
-                <div className="mt-3 rounded-lg border border-neutral-200/80 bg-neutral-100/50 p-3 text-xs text-neutral-600 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-300">
+                <div className="mt-3.5 rounded-xl border border-blue-200/70 bg-blue-50/60 p-3.5 text-xs leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200">
                   💡 <strong>Catatan:</strong> Simpan <strong>Kode Pendaftaran</strong> dan <strong>Nomor WhatsApp</strong> Anda. Keduanya digunakan bersama untuk memeriksa status verifikasi dan mengunduh E-Tiket di halaman <strong>Cek Tiket</strong>.
                 </div>
 
                 {/* Download Proof Button */}
-                <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-700/60 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-4 pt-3.5 border-t border-neutral-200/80 dark:border-neutral-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
                       Simpan Bukti Pendaftaran
@@ -520,7 +530,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                     size="sm"
                     onClick={handleDownloadProof}
                     disabled={isDownloadingProof}
-                    className="text-xs h-8 gap-1.5 border-neutral-300 dark:border-neutral-700 cursor-pointer"
+                    className="w-full sm:w-auto text-xs h-8 gap-1.5 border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer shrink-0"
                   >
                     <Download className="h-3.5 w-3.5" />
                     <span>{isDownloadingProof ? 'Menyiapkan...' : 'Unduh Bukti Pendaftaran (PNG)'}</span>
@@ -529,9 +539,11 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
               </div>
 
               {/* Success Message from Admin */}
-              <div className="mt-6 rounded-lg bg-neutral-100/80 p-4 text-sm text-neutral-700 dark:bg-neutral-800/80 dark:text-neutral-300">
-                {event.success_message}
-              </div>
+              {event.success_message && (
+                <div className="mt-6 rounded-xl border border-neutral-200/70 bg-neutral-50/80 p-4 text-xs sm:text-sm text-neutral-700 dark:border-neutral-800 dark:bg-neutral-850 dark:text-neutral-300 leading-relaxed whitespace-pre-line">
+                  {event.success_message}
+                </div>
+              )}
 
               {/* WhatsApp Action Button */}
               <div className="mt-8 border-t border-neutral-200 pt-6 dark:border-neutral-800">
