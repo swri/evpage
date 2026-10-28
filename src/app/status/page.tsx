@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { checkStatus, getOrganizationSettings } from '@/lib/store';
-import { formatRupiah, formatIndoDate } from '@/lib/utils';
+import { formatRupiah, formatIndoDate, formatTicketCode, formatEventDateTime } from '@/lib/utils';
+import { downloadTicketImage } from '@/lib/ticket-canvas';
 import { logger } from '@/lib/logger';
 import { RegistrationStatusResult, OrganizationSettings } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import {
   MessageSquare,
   ShieldAlert,
   Printer,
+  Download,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 
@@ -152,7 +154,7 @@ function StatusContent() {
                 <div>
                   <div className="text-xs text-neutral-500">Kode Pendaftaran</div>
                   <div className="font-mono text-lg font-bold text-neutral-900 dark:text-neutral-100">
-                    {result.code}
+                    {formatTicketCode(result.code)}
                   </div>
                 </div>
 
@@ -169,6 +171,12 @@ function StatusContent() {
                       Menunggu Verifikasi
                     </Badge>
                   )}
+                  {result.status === 'waitlisted' && (
+                    <Badge variant="info" className="px-3 py-1 text-xs gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      Daftar Tunggu
+                    </Badge>
+                  )}
                   {result.status === 'rejected' && (
                     <Badge variant="destructive" className="px-3 py-1 text-xs gap-1">
                       <XCircle className="h-3.5 w-3.5" />
@@ -182,10 +190,34 @@ function StatusContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div>
                   <span className="text-neutral-500">Event:</span>
-                  <p className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
+                  <p className="font-semibold text-neutral-900 dark:text-neutral-100 mt-0.5">
                     {result.event_title}
                   </p>
                 </div>
+                {result.organizer_name && (
+                  <div>
+                    <span className="text-neutral-500">Penyelenggara:</span>
+                    <p className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
+                      {result.organizer_name}
+                    </p>
+                  </div>
+                )}
+                {result.event_location && (
+                  <div className="sm:col-span-2">
+                    <span className="text-neutral-500">Lokasi Pertandingan:</span>
+                    <p className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5 break-words">
+                      {result.event_location}
+                    </p>
+                  </div>
+                )}
+                {result.event_starts_at && (
+                  <div>
+                    <span className="text-neutral-500">Waktu Bermain:</span>
+                    <p className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
+                      {formatEventDateTime(result.event_starts_at)}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <span className="text-neutral-500">Nama Kontak:</span>
                   <p className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
@@ -206,6 +238,43 @@ function StatusContent() {
                 </div>
               </div>
 
+              {/* Status Notice for non-verified registrations */}
+              {result.status === 'pending' && (
+                <div className="rounded-lg border border-amber-200/80 bg-amber-50/70 p-4 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <span>Status: Menunggu Verifikasi Panitia</span>
+                  </div>
+                  <p className="text-amber-800 dark:text-amber-300 leading-relaxed">
+                    Pembayaran dan berkas pendaftaran Anda sedang ditinjau oleh panitia. E-Tiket resmi dengan kode QR masuk akan otomatis aktif di halaman ini setelah verifikasi disetujui.
+                  </p>
+                </div>
+              )}
+
+              {result.status === 'waitlisted' && (
+                <div className="rounded-lg border border-blue-200/80 bg-blue-50/70 p-4 text-xs text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span>Status: Terdaftar di Daftar Tunggu (Waitlist)</span>
+                  </div>
+                  <p className="text-blue-800 dark:text-blue-300 leading-relaxed">
+                    Kuota utama acara saat ini sudah penuh. Pendaftaran Anda tercatat dalam antrean daftar tunggu. Panitia akan menghubungi Anda melalui WhatsApp apabila ada kuota yang terbuka.
+                  </p>
+                </div>
+              )}
+
+              {result.status === 'rejected' && (
+                <div className="rounded-lg border border-red-200/80 bg-red-50/70 p-4 text-xs text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <XCircle className="h-4 w-4 text-red-600" />
+                    <span>Status: Pendaftaran Tidak Diverifikasi</span>
+                  </div>
+                  <p className="text-red-800 dark:text-red-300 leading-relaxed">
+                    Pendaftaran Anda tidak dapat diverifikasi oleh panitia sehingga e-tiket masuk tidak dapat diterbitkan.
+                  </p>
+                </div>
+              )}
+
               {/* Admin Note if Rejected or Special Instruction */}
               {result.admin_note && (
                 <div
@@ -223,12 +292,12 @@ function StatusContent() {
                 </div>
               )}
 
-              {/* Digital E-Ticket & Verified Badge */}
+              {/* Digital E-Ticket & Verified Badge (strictly confirmed/verified status only) */}
               {result.status === 'verified' && (
                 <DigitalTicketCard
                   registration={result}
                   phone={phone}
-                  orgName={orgSettings?.name}
+                  orgName={result.organizer_name || orgSettings?.name}
                 />
               )}
 
@@ -288,16 +357,19 @@ function DigitalTicketCard({
   orgName?: string;
 }) {
   const [qrImageUrl, setQrImageUrl] = useState<string>('');
+  const [isDownloading, setIsDownloading] = useState(false);
 
+  const cleanCode = formatTicketCode(registration.code);
+  // PRIVACY SAFE: QR payload contains ONLY the clean registration code or status URL with code (NO phone number!)
   const qrData =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/status?code=${encodeURIComponent(registration.code)}&phone=${encodeURIComponent(phone)}`
-      : registration.code;
+      ? `${window.location.origin}/status?code=${encodeURIComponent(cleanCode)}`
+      : cleanCode;
 
   useEffect(() => {
     let active = true;
     QRCode.toDataURL(qrData, {
-      width: 200,
+      width: 240,
       margin: 1,
       errorCorrectionLevel: 'M',
       color: {
@@ -320,12 +392,33 @@ function DigitalTicketCard({
     window.print();
   };
 
+  const handleDownloadTicket = async () => {
+    setIsDownloading(true);
+    try {
+      await downloadTicketImage({
+        type: 'ticket',
+        eventTitle: registration.event_title,
+        organizerName: registration.organizer_name || orgName || 'Panitia Acara',
+        location: registration.event_location,
+        startsAtFormatted: registration.event_starts_at ? formatEventDateTime(registration.event_starts_at) : undefined,
+        contactName: registration.contact_name,
+        code: cleanCode,
+        statusLabel: 'TERVERIFIKASI / CONFIRMED',
+        qrDataUrl: qrImageUrl,
+      });
+    } catch (err) {
+      logger.error('status-download', 'Gagal mengunduh e-tiket:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="rounded-xl border-2 border-dashed border-emerald-500/40 bg-gradient-to-b from-emerald-50/50 to-white p-5 dark:from-emerald-950/20 dark:to-neutral-900 shadow-sm space-y-4 print:border-solid print:p-6 print:m-0">
       <div className="flex items-start justify-between gap-4 border-b border-emerald-200/60 pb-3 dark:border-emerald-800/40">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-            {orgName || 'E-TIKET RESMI'}
+            {registration.organizer_name || orgName || 'E-TIKET RESMI'}
           </span>
           <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">
             {registration.event_title || 'Kartu Peserta Resmi'}
@@ -345,7 +438,7 @@ function DigitalTicketCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={qrImageUrl}
-              alt={`QR Code ${registration.code}`}
+              alt={`QR Code ${cleanCode}`}
               className="h-32 w-32 object-contain"
             />
           ) : (
@@ -354,7 +447,7 @@ function DigitalTicketCard({
             </div>
           )}
           <span className="mt-1 font-mono text-[11px] font-bold text-neutral-800 tracking-wider">
-            {registration.code}
+            {cleanCode}
           </span>
         </div>
 
@@ -365,6 +458,24 @@ function DigitalTicketCard({
               {registration.contact_name}
             </span>
           </div>
+
+          {registration.event_location && (
+            <div>
+              <span className="text-neutral-500 block">Lokasi Pertandingan:</span>
+              <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                {registration.event_location}
+              </span>
+            </div>
+          )}
+
+          {registration.event_starts_at && (
+            <div>
+              <span className="text-neutral-500 block">Waktu Bermain:</span>
+              <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                {formatEventDateTime(registration.event_starts_at)}
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -398,7 +509,17 @@ function DigitalTicketCard({
         </div>
       </div>
 
-      <div className="pt-2 flex items-center justify-end print:hidden">
+      <div className="pt-2 flex flex-wrap items-center justify-end gap-2 print:hidden">
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleDownloadTicket}
+          disabled={isDownloading || !qrImageUrl}
+          className="text-xs h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+        >
+          <Download className="h-3.5 w-3.5" />
+          <span>{isDownloading ? 'Menyiapkan...' : 'Unduh E-Tiket (PNG)'}</span>
+        </Button>
         <Button
           type="button"
           variant="outline"

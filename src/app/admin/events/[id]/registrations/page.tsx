@@ -11,7 +11,7 @@ import {
   promoteFromWaitlist,
   setCheckIn,
 } from '@/lib/store';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, formatTicketCode, cleanTicketCode } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { EventItem, Registration, RegistrationStatus } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -134,7 +134,9 @@ function EventRegistrationsContent({
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const codeMatch = reg.code.toLowerCase().includes(q);
+        const cleanQ = cleanTicketCode(searchQuery);
+        const codeMatch =
+          cleanTicketCode(reg.code).includes(cleanQ) || reg.code.toLowerCase().includes(q);
         const nameMatch = reg.contact_name.toLowerCase().includes(q);
         const phoneMatch = reg.contact_phone.toLowerCase().includes(q);
         const emailMatch = reg.contact_email?.toLowerCase().includes(q) || false;
@@ -283,8 +285,8 @@ function EventRegistrationsContent({
       toast({
         type: 'success',
         message: nextValue
-          ? `${reg.code} berhasil dicatat hadir.`
-          : `Kehadiran ${reg.code} dibatalkan.`,
+          ? `${formatTicketCode(reg.code)} berhasil dicatat hadir.`
+          : `Kehadiran ${formatTicketCode(reg.code)} dibatalkan.`,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Gagal mencatat kehadiran';
@@ -293,14 +295,14 @@ function EventRegistrationsContent({
   };
 
   const handleDelete = async (id: string, code: string) => {
-    if (confirm(`Yakin ingin menghapus pendaftaran ${code}? Tindakan ini tidak dapat dibatalkan.`)) {
+    if (confirm(`Yakin ingin menghapus pendaftaran ${formatTicketCode(code)}? Tindakan ini tidak dapat dibatalkan.`)) {
       try {
         await applyChange(
           registrations.filter((r) => r.id !== id),
           () => deleteRegistration(id)
         );
         setSelectedIds((prev) => prev.filter((i) => i !== id));
-        toast({ type: 'info', message: `Data registrasi ${code} telah dihapus.` });
+        toast({ type: 'info', message: `Data registrasi ${formatTicketCode(code)} telah dihapus.` });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Gagal menghapus registrasi';
         toast({ type: 'error', message });
@@ -373,7 +375,7 @@ function EventRegistrationsContent({
       });
 
       return sanitizeCsvRow({
-        'Kode Tiket': r.code,
+        'Kode Tiket': formatTicketCode(r.code),
         Status: r.status,
         'Hadir': r.checked_in_at || '-',
         'Nama Pendaftar': r.contact_name,
@@ -411,7 +413,7 @@ function EventRegistrationsContent({
         });
 
         return sanitizeCsvRow({
-          'Kode Tiket': r.code,
+          'Kode Tiket': formatTicketCode(r.code),
           Status: r.status,
           'Hadir': r.checked_in_at || '-',
           'Nama Pendaftar': r.contact_name,
@@ -456,7 +458,7 @@ function EventRegistrationsContent({
       );
       toast({
         type: 'success',
-        message: `Status ${activeDetailReg.code} berhasil diubah ke ${drawerStatus}!`,
+        message: `Status ${formatTicketCode(activeDetailReg.code)} berhasil diubah ke ${drawerStatus}!`,
       });
       if (prevStatus === 'waitlisted' && drawerStatus === 'pending') {
         setPromotedIds((prev) =>

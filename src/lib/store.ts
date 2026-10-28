@@ -1,6 +1,6 @@
 import type { EventItem, OrganizationSettings, Registration, RegistrationStatus, RegistrationStatusResult } from '../types/index.ts';
 import { INITIAL_EVENTS, INITIAL_REGISTRATIONS } from './data-service.ts';
-import { formatRupiah, formatIndoDate } from './utils.ts';
+import { formatRupiah, formatIndoDate, cleanTicketCode } from './utils.ts';
 import { logger } from './logger.ts';
 import { createClient as getSupabaseClient, isSupabaseConfigured } from './supabase/client.ts';
 import { dbError, getStorage, isBrowser, setStorage } from './local-db.ts';
@@ -565,15 +565,15 @@ export async function createRegistration(params: {
     }
   }
 
-  // Generate unique registration code: PREFIX-YEAR-0001 (sequence over all statuses)
+  // Generate unique registration code: PREFIX + YEAR + 0001 (without dashes, sequence over all statuses)
   const year = new Date().getFullYear();
   let count = eventRegs.length + 1;
   const prefix = (event.prefix_code || 'EVT').toUpperCase();
-  let code = `${prefix}-${year}-${String(count).padStart(4, '0')}`;
+  let code = `${prefix}${year}${String(count).padStart(4, '0')}`;
 
-  while (allRegs.some(r => r.code === code)) {
+  while (allRegs.some(r => cleanTicketCode(r.code) === cleanTicketCode(code))) {
     count++;
-    code = `${prefix}-${year}-${String(count).padStart(4, '0')}`;
+    code = `${prefix}${year}${String(count).padStart(4, '0')}`;
   }
 
   const newReg: Registration = {
@@ -752,8 +752,8 @@ export async function deleteRegistration(id: string): Promise<boolean> {
 }
 
 export async function checkStatus(code: string, phone: string): Promise<RegistrationStatusResult | null> {
-  const cleanCode = code.trim().toUpperCase();
-  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const cleanCode = cleanTicketCode(code);
+  const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
   // Both factors are mandatory: codes are sequential and easy to guess
   if (!cleanCode || !cleanPhone) return null;
 
@@ -767,7 +767,11 @@ export async function checkStatus(code: string, phone: string): Promise<Registra
     });
     if (error) throw new Error(error.message || 'Gagal memeriksa status pendaftaran');
     const row = Array.isArray(data) ? data[0] : data;
-    return (row as RegistrationStatusResult) || null;
+    if (!row) return null;
+    return {
+      ...(row as RegistrationStatusResult),
+      code: cleanTicketCode((row as RegistrationStatusResult).code),
+    };
   }
 
   const allRegs = await getAllRegistrations();
@@ -775,7 +779,7 @@ export async function checkStatus(code: string, phone: string): Promise<Registra
 
   const found = allRegs.find(r => {
     const regCleanPhone = (r.contact_phone || '').replace(/[^0-9]/g, '');
-    return r.code.toUpperCase() === cleanCode && regCleanPhone !== '' && regCleanPhone === cleanPhone;
+    return cleanTicketCode(r.code) === cleanCode && regCleanPhone !== '' && regCleanPhone === cleanPhone;
   });
 
   if (!found) return null;
@@ -783,8 +787,11 @@ export async function checkStatus(code: string, phone: string): Promise<Registra
   const event = events.find(e => e.id === found.event_id);
 
   return {
-    code: found.code,
+    code: cleanTicketCode(found.code),
     event_title: event?.title || 'Event',
+    organizer_name: event?.organizer_name || 'Panitia Resmi',
+    event_location: event?.location,
+    event_starts_at: event?.starts_at,
     contact_name: found.contact_name,
     status: found.status,
     admin_note: found.admin_note,

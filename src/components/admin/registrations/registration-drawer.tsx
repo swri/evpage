@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PaymentProofPreview } from '@/components/admin/payment-proof-preview';
-import { formatIndoDate, formatRupiah } from '@/lib/utils';
+import { formatIndoDate, formatRupiah, formatTicketCode } from '@/lib/utils';
 import { Save, MessageSquare, ExternalLink, Edit, FileText } from 'lucide-react';
 
 interface RegistrationDrawerProps {
@@ -65,7 +65,7 @@ export function RegistrationDrawer({
             </div>
             <div className="flex items-center justify-between mt-1">
               <h2 className="text-xl font-bold font-mono text-neutral-900 dark:text-neutral-100">
-                {activeDetailReg.code}
+                {formatTicketCode(activeDetailReg.code)}
               </h2>
               <Badge
                 variant={

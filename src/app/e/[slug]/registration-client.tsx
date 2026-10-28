@@ -10,7 +10,16 @@ import {
   remainingSlots,
   buildWhatsAppLink,
 } from '@/lib/store';
-import { formatRupiah, formatIndoDate } from '@/lib/utils';
+import {
+  formatRupiah,
+  formatIndoDate,
+  formatTicketCode,
+  formatEventDateTime,
+  formatDeadlineDateTime,
+  getDeadlineCountdown,
+} from '@/lib/utils';
+import { downloadEventIcs } from '@/lib/calendar';
+import { downloadTicketImage } from '@/lib/ticket-canvas';
 import { logger } from '@/lib/logger';
 import { EventItem, OrganizationSettings, Registration } from '@/types';
 import { DynamicFormField } from '@/components/form/dynamic-form-field';
@@ -29,6 +38,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Copy,
+  Check,
   MessageSquare,
   AlertTriangle,
   Upload,
@@ -37,6 +47,8 @@ import {
   FileText,
   Search,
   ExternalLink,
+  Download,
+  CalendarPlus,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { RegistrationFormSkeleton } from '@/components/ui/skeleton';
@@ -101,6 +113,10 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
   // Success State
   const [createdRegistration, setCreatedRegistration] = useState<Registration | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedAccNumber, setCopiedAccNumber] = useState(false);
+  const [copiedAmount, setCopiedAmount] = useState(false);
+  const [isDownloadingProof, setIsDownloadingProof] = useState(false);
 
   useEffect(() => {
     if (preloaded) return;
@@ -310,10 +326,11 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
         origin: { y: 0.6 },
       });
 
+      const cleanNewCode = formatTicketCode(newRegistration.code);
       toast({
         type: 'success',
         title: 'Pendaftaran Berhasil!',
-        message: `Kode Anda: ${newRegistration.code}. Silakan konfirmasi via WhatsApp.`,
+        message: `Kode Anda: ${cleanNewCode}. Silakan konfirmasi via WhatsApp.`,
       });
 
       // Scroll to top
@@ -340,7 +357,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
   const waLink = createdRegistration
     ? buildWhatsAppLink(waAdminPhone, event.wa_template, {
       event: event.title,
-      kode: createdRegistration.code,
+      kode: formatTicketCode(createdRegistration.code),
       nama: createdRegistration.contact_name,
       total: formatRupiah(createdRegistration.total_amount),
       bukti: paymentProofName ? `Bukti terlampir (${paymentProofName})` : 'Bukti terunggah di sistem',
@@ -350,13 +367,72 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
   // Copy registration code
   const handleCopyCode = () => {
     if (!createdRegistration) return;
-    navigator.clipboard.writeText(createdRegistration.code);
+    const clean = formatTicketCode(createdRegistration.code);
+    navigator.clipboard.writeText(clean);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
     toast({
       type: 'info',
       message: 'Kode pendaftaran berhasil disalin ke clipboard!',
     });
+  };
+
+  // Copy event address
+  const handleCopyAddress = () => {
+    if (!event?.location) return;
+    navigator.clipboard.writeText(event.location);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2000);
+    toast({
+      type: 'info',
+      message: 'Alamat pertandingan berhasil disalin!',
+    });
+  };
+
+  // Copy bank account number
+  const handleCopyAccNumber = () => {
+    const acc = orgSettings?.payment_info.account_number;
+    if (!acc) return;
+    navigator.clipboard.writeText(acc);
+    setCopiedAccNumber(true);
+    setTimeout(() => setCopiedAccNumber(false), 2000);
+    toast({
+      type: 'info',
+      message: 'Nomor rekening panitia berhasil disalin!',
+    });
+  };
+
+  // Copy transfer amount
+  const handleCopyAmount = () => {
+    navigator.clipboard.writeText(String(totalCost));
+    setCopiedAmount(true);
+    setTimeout(() => setCopiedAmount(false), 2000);
+    toast({
+      type: 'info',
+      message: 'Nominal transfer berhasil disalin!',
+    });
+  };
+
+  // Download registration proof PNG
+  const handleDownloadProof = async () => {
+    if (!createdRegistration || !event) return;
+    setIsDownloadingProof(true);
+    try {
+      await downloadTicketImage({
+        type: 'proof',
+        eventTitle: event.title,
+        organizerName: event.organizer_name || orgSettings?.name || 'Panitia Acara',
+        location: event.location,
+        startsAtFormatted: event.starts_at ? formatEventDateTime(event.starts_at) : undefined,
+        contactName: createdRegistration.contact_name,
+        code: formatTicketCode(createdRegistration.code),
+        statusLabel: 'MENUNGGU VERIFIKASI (Bukan Tiket Masuk)',
+      });
+    } catch (err) {
+      logger.error('proof-download', 'Gagal mengunduh bukti pendaftaran:', err);
+    } finally {
+      setIsDownloadingProof(false);
+    }
   };
 
   return (
@@ -412,7 +488,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-4">
                   <div className="font-mono text-2xl font-extrabold tracking-wider text-neutral-900 dark:text-neutral-50">
-                    {createdRegistration.code}
+                    {formatTicketCode(createdRegistration.code)}
                   </div>
                   <Button
                     type="button"
@@ -441,6 +517,34 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                       </span>
                     </>
                   )}
+                </div>
+
+                {/* Important notice on tracking info */}
+                <div className="mt-3 rounded-lg border border-neutral-200/80 bg-neutral-100/50 p-3 text-xs text-neutral-600 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-300">
+                  💡 <strong>Catatan:</strong> Simpan <strong>Kode Pendaftaran</strong> dan <strong>Nomor WhatsApp</strong> Anda. Keduanya digunakan bersama untuk memeriksa status verifikasi dan mengunduh E-Tiket di halaman <strong>Cek Tiket</strong>.
+                </div>
+
+                {/* Download Proof Button */}
+                <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-700/60 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+                      Simpan Bukti Pendaftaran
+                    </div>
+                    <div className="text-[11px] text-neutral-500">
+                      Status: Menunggu verifikasi (bukan tiket masuk)
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDownloadProof}
+                    disabled={isDownloadingProof}
+                    className="text-xs h-8 gap-1.5 border-neutral-300 dark:border-neutral-700 cursor-pointer"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>{isDownloadingProof ? 'Menyiapkan...' : 'Unduh Bukti Pendaftaran (PNG)'}</span>
+                  </Button>
                 </div>
               </div>
 
@@ -474,10 +578,34 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs">
                   <div>
                     <dt className="text-neutral-500">Event</dt>
-                    <dd className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
+                    <dd className="font-semibold text-neutral-900 dark:text-neutral-100 mt-0.5">
                       {event.title}
                     </dd>
                   </div>
+                  {event.organizer_name && (
+                    <div>
+                      <dt className="text-neutral-500">Penyelenggara</dt>
+                      <dd className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
+                        {event.organizer_name}
+                      </dd>
+                    </div>
+                  )}
+                  {event.location && (
+                    <div className="sm:col-span-2">
+                      <dt className="text-neutral-500">Lokasi Pertandingan</dt>
+                      <dd className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5 break-words">
+                        {event.location}
+                      </dd>
+                    </div>
+                  )}
+                  {event.starts_at && (
+                    <div>
+                      <dt className="text-neutral-500">Waktu Bermain</dt>
+                      <dd className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
+                        {formatEventDateTime(event.starts_at)}
+                      </dd>
+                    </div>
+                  )}
                   <div>
                     <dt className="text-neutral-500">Total Biaya</dt>
                     <dd className="font-semibold text-neutral-900 dark:text-neutral-100 mt-0.5">
@@ -496,12 +624,17 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                       {createdRegistration.contact_phone}
                     </dd>
                   </div>
-                  <div>
-                    <dt className="text-neutral-500">Email</dt>
-                    <dd className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
-                      {createdRegistration.contact_email}
-                    </dd>
-                  </div>
+                  {/* Hide email row completely if empty or '-' */}
+                  {createdRegistration.contact_email &&
+                    createdRegistration.contact_email !== '-' &&
+                    createdRegistration.contact_email.trim() !== '' && (
+                      <div>
+                        <dt className="text-neutral-500">Email</dt>
+                        <dd className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
+                          {createdRegistration.contact_email}
+                        </dd>
+                      </div>
+                    )}
                   <div>
                     <dt className="text-neutral-500">Waktu Mendaftar</dt>
                     <dd className="font-medium text-neutral-900 dark:text-neutral-100 mt-0.5">
@@ -514,7 +647,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
               {/* Navigation Actions */}
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-neutral-200 pt-6 dark:border-neutral-800">
                 <Link
-                  href={`/status?code=${createdRegistration.code}&phone=${encodeURIComponent(createdRegistration.contact_phone)}`}
+                  href={`/status?code=${encodeURIComponent(formatTicketCode(createdRegistration.code))}&phone=${encodeURIComponent(createdRegistration.contact_phone)}`}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-medium text-neutral-700 shadow-2xs hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
                 >
                   <Search className="h-3.5 w-3.5" />
@@ -572,59 +705,187 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                 {event.title}
               </h1>
 
-              {/* Event Metadata (Date, Location, Quota) */}
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-neutral-600 dark:text-neutral-400">
-                {event.organizer_name && (
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-neutral-500 shrink-0" />
-                    <span>
-                      Penyelenggara:{' '}
-                      <strong className="font-semibold text-neutral-800 dark:text-neutral-200">
-                        {event.organizer_name}
-                      </strong>
-                    </span>
-                  </div>
-                )}
-                {event.starts_at && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-neutral-500 shrink-0" />
-                    <span>{formatIndoDate(event.starts_at, true)}</span>
-                  </div>
-                )}
+              {/* Event Information Cards Grid */}
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* 1. Lokasi Pertandingan (Full width on sm) */}
                 {event.location && (
-                  // Full width and wrapping: long addresses must stay readable
-                  <div className="flex items-start gap-2 sm:col-span-2 sm:order-first">
-                    <MapPin className="h-4 w-4 text-neutral-500 shrink-0 mt-px" />
-                    <a
-                      href={locationHref(event.location, event.location_url) ?? undefined}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="break-words underline decoration-neutral-300 underline-offset-2 hover:text-neutral-900 hover:decoration-neutral-500 dark:decoration-neutral-600 dark:hover:text-neutral-100"
-                    >
+                  <div className="sm:col-span-2 rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60 transition-all">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      <span>Lokasi Pertandingan</span>
+                    </div>
+                    <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 leading-snug break-words">
                       {event.location}
-                      <span className="ml-1 whitespace-nowrap text-neutral-500 no-underline">· Buka di Maps</span>
-                    </a>
+                    </div>
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyAddress}
+                        className="h-7 text-xs gap-1.5 px-2.5 bg-white dark:bg-neutral-800 cursor-pointer"
+                      >
+                        {copiedAddress ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            <span>Alamat Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Salin Alamat</span>
+                          </>
+                        )}
+                      </Button>
+                      {event.location && (
+                        <a
+                          href={locationHref(event.location, event.location_url) ?? '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          <span>Buka di Maps</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-neutral-500 shrink-0" />
-                  <span>
+
+                {/* 2. Waktu Bermain */}
+                {event.starts_at && (
+                  <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                        <span>Waktu Bermain</span>
+                      </div>
+                      <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                        {formatEventDateTime(event.starts_at)}
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadEventIcs(event)}
+                        className="h-7 text-xs gap-1.5 px-2.5 bg-white dark:bg-neutral-800 cursor-pointer w-full sm:w-auto"
+                      >
+                        <CalendarPlus className="h-3 w-3" />
+                        <span>Tambah ke Kalender (.ics)</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Batas Akhir Pendaftaran */}
+                {event.registration_deadline && (() => {
+                  const deadlineCountdown = getDeadlineCountdown(event.registration_deadline);
+                  return (
+                    <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            <Clock className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                            <span>Batas Akhir Pendaftaran</span>
+                          </div>
+                          {deadlineCountdown.label && (
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                deadlineCountdown.isPassed
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+                                  : (deadlineCountdown.daysLeft ?? 99) <= 2
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                              }`}
+                            >
+                              {deadlineCountdown.label}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                          {formatDeadlineDateTime(event.registration_deadline)}
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-neutral-200/60 dark:border-neutral-800 text-[11px] text-neutral-500">
+                        {deadlineCountdown.isPassed
+                          ? 'Waktu pendaftaran untuk acara ini telah ditutup.'
+                          : 'Pastikan mendaftar sebelum batas waktu berakhir.'}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 4. Penyelenggara */}
+                {event.organizer_name && (
+                  <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      <span>Penyelenggara</span>
+                    </div>
+                    <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                      {event.organizer_name}
+                    </div>
+                    <div className="mt-2 text-[11px] text-neutral-500">
+                      Diselenggarakan resmi oleh pihak {event.organizer_name}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Sisa Kuota */}
+                <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                      <Users className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      <span>Sisa Kuota</span>
+                    </div>
+                    {isQuotaFull && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                        {joinsWaitlist ? 'Daftar Tunggu' : 'Penuh'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
                     {remainingQuota === null ? (
                       'Kuota tidak dibatasi'
                     ) : (
                       <>
-                        Sisa Kuota: <strong>{remainingQuota}</strong> {quotaUnit} (total {event.quota})
-                        {joinsWaitlist && ' · daftar tunggu dibuka'}
+                        {remainingQuota} {quotaUnit}{' '}
+                        <span className="text-xs font-normal text-neutral-500">
+                          (total kapasitas {event.quota})
+                        </span>
                       </>
                     )}
-                  </span>
-                </div>
-                {event.registration_deadline && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-neutral-500 shrink-0" />
-                    <span>Batas Akhir: {formatIndoDate(event.registration_deadline, true)}</span>
                   </div>
-                )}
+                  <div className="mt-2 text-[11px] text-neutral-500">
+                    {remainingQuota === null
+                      ? 'Pendaftaran terbuka tanpa batas peserta.'
+                      : isQuotaFull
+                      ? joinsWaitlist
+                        ? 'Kuota utama penuh, pendaftar baru masuk daftar tunggu.'
+                        : 'Seluruh kuota pendaftaran telah terisi penuh.'
+                      : `Tersisa ${remainingQuota} slot ${quotaUnit} yang masih tersedia.`}
+                  </div>
+                </div>
+
+                {/* 6. Biaya Pendaftaran */}
+                <div className="rounded-xl border border-neutral-200/90 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5">
+                    <CreditCard className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                    <span>Biaya Pendaftaran</span>
+                  </div>
+                  <div className="text-sm font-bold text-neutral-900 dark:text-neutral-100 leading-snug">
+                    {event.price_type === 'free' ? 'Gratis' : formatRupiah(event.price_amount)}
+                  </div>
+                  <div className="mt-2 text-[11px] text-neutral-500">
+                    {event.price_type === 'free'
+                      ? 'Tidak dipungut biaya pendaftaran.'
+                      : event.price_type === 'per_participant'
+                      ? 'Biaya per satu peserta yang didaftarkan.'
+                      : 'Biaya per pendaftaran (satu tim / grup).'}
+                  </div>
+                </div>
               </div>
 
               {/* Description (Markdown-like formatting) */}
@@ -747,68 +1008,141 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
 
                     {/* Total Cost Display Box */}
                     <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-800/40 mb-6">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">
-                          Total Yang Harus Dibayar
-                        </span>
-                        <span className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-neutral-100">
-                          {formatRupiah(totalCost)}
-                        </span>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400 block">
+                            Total Yang Harus Dibayar
+                          </span>
+                          <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100">
+                            {formatRupiah(totalCost)}
+                          </span>
+                        </div>
+                        {totalCost > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCopyAmount}
+                            className="h-8 text-xs gap-1.5 self-start sm:self-auto bg-white dark:bg-neutral-800 cursor-pointer"
+                          >
+                            {copiedAmount ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Nominal Tersalin!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                <span>Salin Nominal</span>
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                       {event.price_type === 'per_participant' && (
-                        <p className="text-[11px] text-neutral-500 mt-1 text-right">
+                        <p className="text-[11px] text-neutral-500 mt-2">
                           Dihitung berdasarkan jumlah peserta yang didaftarkan ({formatRupiah(event.price_amount)} /peserta)
                         </p>
                       )}
                     </div>
 
                     {/* Payment Instruction & Bank / QRIS */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                      {/* Bank Transfer Info */}
-                      <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800 bg-white dark:bg-neutral-900">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
-                          <CreditCard className="h-4 w-4" />
-                          <span>Transfer Bank Manual</span>
-                        </div>
-                        <div className="space-y-1 text-xs">
-                          <div className="text-neutral-500">Bank:</div>
-                          <div className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
-                            {orgSettings?.payment_info.bank_name || '-'}
-                          </div>
-                          <div className="text-neutral-500 mt-2">Nomor Rekening:</div>
-                          <div className="font-mono font-bold text-sm text-neutral-900 dark:text-neutral-100">
-                            {orgSettings?.payment_info.account_number || 'Belum diatur panitia'}
-                          </div>
-                          <div className="text-neutral-500 mt-2">Atas Nama:</div>
-                          <div className="font-medium text-neutral-800 dark:text-neutral-200">
-                            {orgSettings?.payment_info.account_holder || '-'}
-                          </div>
-                        </div>
-                      </div>
+                    {(() => {
+                      const hasQris = Boolean(
+                        orgSettings?.payment_info?.qris_url &&
+                          orgSettings.payment_info.qris_url.trim().length > 0
+                      );
+                      return (
+                        <div
+                          className={`grid gap-4 mb-6 ${
+                            hasQris ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'
+                          }`}
+                        >
+                          {/* Bank Transfer Info (Full width if no QRIS) */}
+                          <div className="rounded-xl border border-neutral-200 p-5 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs">
+                            <div className="flex items-center justify-between mb-3 border-b border-neutral-100 pb-2.5 dark:border-neutral-800">
+                              <div className="flex items-center gap-2 text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                                <CreditCard className="h-4 w-4 text-emerald-600" />
+                                <span>Transfer Bank Manual</span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px]">
+                                {hasQris ? 'Pilihan 1' : 'Metode Transfer'}
+                              </Badge>
+                            </div>
+                            <div className="space-y-2.5 text-xs">
+                              <div>
+                                <span className="text-neutral-500 block text-[11px]">Nama Bank Tujuan:</span>
+                                <span className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                                  {orgSettings?.payment_info.bank_name || '-'}
+                                </span>
+                              </div>
 
-                      {/* QRIS Info */}
-                      <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800 bg-white dark:bg-neutral-900 flex flex-col items-center justify-center text-center">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
-                          <QrCode className="h-4 w-4" />
-                          <span>Scan QRIS Instan</span>
-                        </div>
-                        {orgSettings?.payment_info.qris_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={orgSettings.payment_info.qris_url}
-                            alt="QRIS Pembayaran"
-                            className="h-32 w-32 rounded-lg border border-neutral-200 dark:border-neutral-700 object-contain p-1 bg-white"
-                          />
-                        ) : (
-                          <div className="flex h-32 w-32 items-center justify-center rounded-lg border border-dashed border-neutral-300 text-xs text-neutral-400">
-                            QRIS Panitia
+                              <div>
+                                <span className="text-neutral-500 block text-[11px]">Nomor Rekening:</span>
+                                <div className="flex items-center justify-between gap-2 mt-0.5">
+                                  <span className="font-mono font-extrabold text-base sm:text-lg text-neutral-900 dark:text-neutral-100 tracking-wider">
+                                    {orgSettings?.payment_info.account_number || 'Belum diatur panitia'}
+                                  </span>
+                                  {orgSettings?.payment_info.account_number && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleCopyAccNumber}
+                                      className="h-7 text-xs gap-1.5 px-2.5 bg-neutral-50 dark:bg-neutral-800 cursor-pointer shrink-0"
+                                    >
+                                      {copiedAccNumber ? (
+                                        <>
+                                          <Check className="h-3 w-3 text-emerald-600" />
+                                          <span>Tersalin</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="h-3 w-3" />
+                                          <span>Salin Nomor</span>
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div>
+                                <span className="text-neutral-500 block text-[11px]">Atas Nama Rekening:</span>
+                                <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+                                  {orgSettings?.payment_info.account_holder || '-'}
+                                </span>
+                              </div>
+
+                              {orgSettings?.payment_info.instructions && (
+                                <div className="mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 text-[11px] text-neutral-500 leading-relaxed">
+                                  {orgSettings.payment_info.instructions}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        <span className="text-[11px] text-neutral-500 mt-2">
-                          Mendukung GoPay, OVO, Dana, ShopeePay, BCA, dll.
-                        </span>
-                      </div>
-                    </div>
+
+                          {/* QRIS Info: completely hidden if no QRIS exists */}
+                          {hasQris && (
+                            <div className="rounded-xl border border-neutral-200 p-5 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs flex flex-col items-center justify-center text-center">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800 dark:text-neutral-200 mb-3">
+                                <QrCode className="h-4 w-4 text-emerald-600" />
+                                <span>Scan QRIS Instan</span>
+                              </div>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={orgSettings!.payment_info.qris_url}
+                                alt="QRIS Pembayaran Panitia"
+                                className="h-36 w-36 rounded-xl border border-neutral-200 dark:border-neutral-700 object-contain p-1.5 bg-white shadow-2xs"
+                              />
+                              <span className="text-[11px] text-neutral-500 mt-2.5">
+                                Mendukung GoPay, OVO, Dana, ShopeePay, BCA, dll.
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Upload Bukti Pembayaran */}
                     <div className="space-y-2" id="payment_proof">

@@ -170,6 +170,9 @@ export interface AdminUser {
 export interface RegistrationStatusResult {
   code: string;
   event_title: string;
+  organizer_name?: string;
+  event_location?: string;
+  event_starts_at?: string;
   contact_name: string;
   status: RegistrationStatus;
   admin_note?: string;

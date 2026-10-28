@@ -88,6 +88,8 @@ export function normalizeWhatsAppNumber(phone: string): string {
   return digits.startsWith('0') ? '62' + digits.slice(1) : digits;
 }
 
+import { formatTicketCode } from './utils.ts';
+
 export function whatsAppLink(phone: string, text: string): string {
   return `https://wa.me/${normalizeWhatsAppNumber(phone)}?text=${encodeURIComponent(text)}`;
 }
@@ -100,14 +102,15 @@ export function buildParticipantMessage(
 ): { kind: NotificationKind; text: string; link: string } {
   const kind = notificationKindFor(reg.status, options.justPromoted);
   const origin = options.origin ?? '';
+  const cleanCode = formatTicketCode(reg.code);
   const text = renderTemplate(getTemplate(event, kind), {
     event: event.title,
-    kode: reg.code,
+    kode: cleanCode,
     nama: reg.contact_name,
     total: options.formatMoney ? options.formatMoney(reg.total_amount) : String(reg.total_amount),
     status: reg.status,
     catatan: reg.admin_note ? `\n\nCatatan panitia: "${reg.admin_note}"` : '',
-    tautan_status: `${origin}/status?code=${encodeURIComponent(reg.code)}`,
+    tautan_status: `${origin}/status?code=${encodeURIComponent(cleanCode)}`,
     tautan_tim: `${origin}/e/${event.slug}/teams`,
   });
   return { kind, text, link: whatsAppLink(reg.contact_phone, text) };

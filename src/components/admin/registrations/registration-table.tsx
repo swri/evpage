@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PaymentProofThumb } from '@/components/admin/payment-proof-preview';
-import { formatIndoDate, formatRupiah } from '@/lib/utils';
+import { formatIndoDate, formatRupiah, formatTicketCode } from '@/lib/utils';
 import { RegistrationStatsData } from './registration-stats';
 import {
   Search,
@@ -234,7 +234,7 @@ export function RegistrationTable({
 
                     {/* Code */}
                     <td className="p-3 font-mono font-bold text-neutral-900 dark:text-neutral-100">
-                      {reg.code}
+                      {formatTicketCode(reg.code)}
                     </td>
 
                     {/* Contact Info with WA Icon */}
@@ -344,7 +344,7 @@ export function RegistrationTable({
                             size="sm"
                             onClick={() => handlePromote(reg.id)}
                             title="Pindahkan dari daftar tunggu"
-                            aria-label={`Pindahkan ${reg.code} dari daftar tunggu`}
+                            aria-label={`Pindahkan ${formatTicketCode(reg.code)} dari daftar tunggu`}
                             className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                           >
                             <ArrowUpCircle className="h-3.5 w-3.5" />
@@ -360,8 +360,8 @@ export function RegistrationTable({
                             title={reg.checked_in_at ? 'Batalkan check-in' : 'Check-in (hadir)'}
                             aria-label={
                               reg.checked_in_at
-                                ? `Batalkan check-in ${reg.code}`
-                                : `Check-in ${reg.code}`
+                                ? `Batalkan check-in ${formatTicketCode(reg.code)}`
+                                : `Check-in ${formatTicketCode(reg.code)}`
                             }
                             aria-pressed={!!reg.checked_in_at}
                             className={`h-7 w-7 p-0 ${
@@ -404,7 +404,7 @@ export function RegistrationTable({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(reg.id, reg.code)}
+                          onClick={() => handleDelete(reg.id, formatTicketCode(reg.code))}
                           title="Hapus"
                           disabled={!canEdit}
                           className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40"

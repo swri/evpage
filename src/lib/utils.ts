@@ -65,3 +65,97 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/**
+ * Normalizes a ticket code by stripping dashes, spaces, and converting to uppercase.
+ * Example: 'TIDDS-2026-0004' -> 'TIDDS20260004'
+ */
+export function cleanTicketCode(code?: string | null): string {
+  if (!code) return '';
+  return code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
+/**
+ * Consistently formats a ticket code for display without hyphens.
+ */
+export function formatTicketCode(code?: string | null): string {
+  return cleanTicketCode(code);
+}
+
+/**
+ * Formats match / play date with dynamic day of week and time in WIB (Asia/Jakarta).
+ * Example: 'Sabtu, 28 November 2026 · 06.00 WIB'
+ */
+export function formatEventDateTime(
+  dateString?: string | null,
+  timeZone = 'Asia/Jakarta'
+): string {
+  if (!dateString) return '-';
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return String(dateString);
+
+    const weekday = new Intl.DateTimeFormat('id-ID', { weekday: 'long', timeZone }).format(d);
+    const date = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone }).format(d);
+    const time = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }).format(d);
+
+    return `${weekday}, ${date} · ${time.replace(':', '.')} WIB`;
+  } catch {
+    return String(dateString);
+  }
+}
+
+/**
+ * Formats deadline date and time with day of week in WIB.
+ * Example: 'Rabu, 25 November 2026 · 20.00 WIB'
+ */
+export function formatDeadlineDateTime(
+  dateString?: string | null,
+  timeZone = 'Asia/Jakarta'
+): string {
+  return formatEventDateTime(dateString, timeZone);
+}
+
+/**
+ * Calculates a friendly countdown status for registration deadlines.
+ */
+export function getDeadlineCountdown(
+  dateString?: string | null
+): { isPassed: boolean; label: string; text: string; daysLeft: number } {
+  if (!dateString) {
+    return { isPassed: false, label: '', text: '', daysLeft: 0 };
+  }
+  const target = new Date(dateString).getTime();
+  if (isNaN(target)) {
+    return { isPassed: false, label: '', text: '', daysLeft: 0 };
+  }
+  const now = Date.now();
+  const diffMs = target - now;
+
+  if (diffMs <= 0) {
+    return {
+      isPassed: true,
+      label: 'Pendaftaran Ditutup',
+      text: 'Batas waktu pendaftaran telah berakhir',
+      daysLeft: 0,
+    };
+  }
+
+  const hoursLeft = Math.ceil(diffMs / (1000 * 60 * 60));
+  if (hoursLeft <= 24) {
+    return {
+      isPassed: false,
+      label: `Tutup ${hoursLeft} jam lagi`,
+      text: `Pendaftaran ditutup hari ini (sisa ${hoursLeft} jam lagi)`,
+      daysLeft: 0,
+    };
+  }
+
+  const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  return {
+    isPassed: false,
+    label: `Sisa ${daysLeft} hari lagi`,
+    text: `Pendaftaran ditutup dalam ${daysLeft} hari lagi`,
+    daysLeft,
+  };
+}
