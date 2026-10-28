@@ -13,6 +13,7 @@ interface PreviewTabProps {
   priceType: PriceType;
   priceAmount: number;
   title: string;
+  description?: string;
   organizerName: string;
   location: string;
   fields: FormField[];
@@ -26,6 +27,7 @@ export function PreviewTab({
   priceType,
   priceAmount,
   title,
+  description,
   organizerName,
   location,
   fields,
@@ -75,6 +77,12 @@ export function PreviewTab({
           )}
           {location && <p className="text-xs text-neutral-500 mt-0.5">{location}</p>}
         </div>
+
+        {description && (
+          <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/60 p-4 text-xs leading-relaxed text-neutral-700 whitespace-pre-line break-words dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-300">
+            {description}
+          </div>
+        )}
 
         <div className="space-y-5 border-t border-neutral-100 pt-5 dark:border-neutral-800">
           {/* Unified Dynamic Form Fields Preview */}

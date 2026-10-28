@@ -483,6 +483,8 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         <SettingsTab
           title={title}
           handleTitleChange={handleTitleChange}
+          description={description}
+          setDescription={setDescription}
           eventType={eventType}
           handleEventTypeChange={handleEventTypeChange}
           groupingEnabled={groupingEnabled}
@@ -531,6 +533,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
           priceType={priceType}
           priceAmount={priceAmount}
           title={title}
+          description={description}
           organizerName={organizerName}
           location={location}
           fields={fields}

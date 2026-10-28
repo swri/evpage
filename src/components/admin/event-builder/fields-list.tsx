@@ -24,6 +24,7 @@ interface FieldsListProps {
 
 const QUICK_TYPES: { label: string; type: FieldType }[] = [
   { label: 'Teks', type: 'text' },
+  { label: 'Teks Panjang', type: 'textarea' },
   { label: 'WhatsApp', type: 'phone' },
   { label: 'Email', type: 'email' },
   { label: 'Angka', type: 'number' },

@@ -12,6 +12,8 @@ import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib
 interface SettingsTabProps {
   title: string;
   handleTitleChange: (val: string) => void;
+  description: string;
+  setDescription: (val: string) => void;
   eventType: string;
   handleEventTypeChange: (val: string) => void;
   groupingEnabled: boolean;
@@ -55,6 +57,8 @@ interface SettingsTabProps {
 export function SettingsTab({
   title,
   handleTitleChange,
+  description,
+  setDescription,
   eventType,
   handleEventTypeChange,
   groupingEnabled,
@@ -148,6 +152,23 @@ export function SettingsTab({
             />
             Aktifkan fitur {resolveEventType({ event_type: eventType }).labels.groupingAction.toLowerCase()}
           </label>
+        </div>
+
+        {/* Description / Deskripsi Event */}
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
+            Deskripsi Event (Informasi Acara / Teks Panjang)
+          </label>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Tuliskan detail jadwal, dresscode, tata tertib, hadiah, link WhatsApp grup/maps, atau pesan sambutan peserta..."
+            rows={6}
+            className="text-xs leading-relaxed"
+          />
+          <span className="text-[11px] text-neutral-400 mt-1 block">
+            Ditampilkan di card utama halaman pendaftaran publik. Teks mendukung banyak baris (paragraf) dan link (https://...) otomatis dapat diklik.
+          </span>
         </div>
 
         {/* Slug URL */}
