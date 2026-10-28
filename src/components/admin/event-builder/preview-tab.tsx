@@ -11,7 +11,7 @@ import { Eye } from 'lucide-react';
 interface PreviewTabProps {
   coverUrl: string;
   priceType: PriceType;
-  priceAmount: number;
+  priceAmount: number | '';
   title: string;
   description?: string;
   organizerName: string;
@@ -64,7 +64,7 @@ export function PreviewTab({
           <div className="flex items-center gap-2 mb-2">
             <Badge variant="success">Pendaftaran Terbuka</Badge>
             <Badge variant="outline">
-              {priceType === 'free' ? 'Gratis' : formatRupiah(priceAmount)}
+              {priceType === 'free' ? 'Gratis' : formatRupiah(priceAmount || 0)}
             </Badge>
           </div>
           <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-neutral-100">

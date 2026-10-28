@@ -37,16 +37,16 @@ interface SettingsTabProps {
   setLocation: (val: string) => void;
   locationUrl: string;
   setLocationUrl: (val: string) => void;
-  quota: number;
-  setQuota: (val: number) => void;
+  quota: number | '';
+  setQuota: (val: number | '') => void;
   quotaMode: QuotaMode;
   setQuotaMode: (val: QuotaMode) => void;
   waitlistEnabled: boolean;
   setWaitlistEnabled: (val: boolean) => void;
   priceType: PriceType;
   setPriceType: (val: PriceType) => void;
-  priceAmount: number;
-  setPriceAmount: (val: number) => void;
+  priceAmount: number | '';
+  setPriceAmount: (val: number | '') => void;
   prefixCode: string;
   setPrefixCode: (val: string) => void;
   waTemplate: string;
@@ -432,8 +432,16 @@ export function SettingsTab({
           <Input
             type="number"
             min="0"
+            placeholder="0"
             value={quota}
-            onChange={(e) => setQuota(parseInt(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
+            onBlur={() => {
+              if (quota === '') setQuota(0);
+            }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQuota(val === '' ? '' : Math.max(0, parseInt(val, 10) || 0));
+            }}
             className="text-xs h-9"
           />
         </div>
@@ -489,12 +497,20 @@ export function SettingsTab({
               type="number"
               min="0"
               step="5000"
+              placeholder="0"
               value={priceAmount}
-              onChange={(e) => setPriceAmount(parseInt(e.target.value) || 0)}
+              onFocus={(e) => e.target.select()}
+              onBlur={() => {
+                if (priceAmount === '') setPriceAmount(0);
+              }}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPriceAmount(val === '' ? '' : Math.max(0, parseInt(val, 10) || 0));
+              }}
               className="text-xs h-9"
             />
             <span className="text-[11px] text-neutral-400">
-              Format tampilan: {formatRupiah(priceAmount)}
+              Format tampilan: {formatRupiah(priceAmount === '' ? 0 : priceAmount)}
             </span>
           </div>
         )}

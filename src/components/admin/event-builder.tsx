@@ -89,7 +89,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
   const [deadline, setDeadline] = useState(
     initialEvent?.registration_deadline ? toWIBDateTimeInput(initialEvent.registration_deadline) : ''
   );
-  const [quota, setQuota] = useState<number>(initialEvent?.quota ?? 32);
+  const [quota, setQuota] = useState<number | ''>(initialEvent?.quota ?? 32);
   const [quotaMode, setQuotaMode] = useState<QuotaMode>(initialEvent?.quota_mode ?? 'registration');
   const [waitlistEnabled, setWaitlistEnabled] = useState<boolean>(initialEvent?.waitlist_enabled ?? false);
   const [eventType, setEventType] = useState<string>(initialEvent?.event_type ?? 'general');
@@ -100,7 +100,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
     () => resolveEventType(initialEvent ?? { event_type: 'general' }).grouping.enabled
   );
   const [priceType, setPriceType] = useState<PriceType>(initialEvent?.price_type || 'fixed');
-  const [priceAmount, setPriceAmount] = useState<number>(initialEvent?.price_amount ?? 750000);
+  const [priceAmount, setPriceAmount] = useState<number | ''>(initialEvent?.price_amount ?? 750000);
   const [prefixCode, setPrefixCode] = useState(initialEvent?.prefix_code || 'MSC');
   const [status, setStatus] = useState<EventStatus>(initialEvent?.status || 'open');
   const [waTemplate, setWaTemplate] = useState(
@@ -309,7 +309,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
         location_url: locationUrl.trim() || null,
         starts_at: fromWIBDateTimeInput(startsAt),
         registration_deadline: fromWIBDateTimeInput(deadline),
-        quota,
+        quota: quota === '' ? 0 : Number(quota),
         quota_mode: quotaMode,
         waitlist_enabled: waitlistEnabled,
         event_type: eventType,
@@ -321,7 +321,7 @@ export function EventBuilder({ initialEvent, isEdit = false }: EventBuilderProps
           },
         },
         price_type: priceType,
-        price_amount: priceAmount,
+        price_amount: priceAmount === '' ? 0 : Number(priceAmount),
         prefix_code: prefixCode.trim().toUpperCase(),
         status,
         organizer_name: organizerName.trim() || 'Panitia Resmi',
