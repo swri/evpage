@@ -710,7 +710,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
 
               {/* Description (Markdown-like formatting) */}
               {event.description && (
-                <div className="mt-6 prose prose-neutral dark:prose-invert max-w-none text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-line break-words leading-relaxed bg-neutral-50/60 dark:bg-neutral-900/60 p-4 rounded-xl border border-neutral-200/60 dark:border-neutral-800">
+                <div className="mt-5 rounded-2xl border border-neutral-200/80 bg-white/95 p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-all duration-200 dark:border-neutral-800/80 dark:bg-neutral-900/80 backdrop-blur-xs text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-line break-words leading-relaxed">
                   {/* http(s) URLs written by the organizer become clickable links */}
                   {formatDescriptionText(event.description).map((seg, i) =>
                     seg.type === 'link' ? (

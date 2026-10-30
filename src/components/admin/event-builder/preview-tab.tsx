@@ -110,7 +110,7 @@ export function PreviewTab({
         </div>
 
         {description && (
-          <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/60 p-4 text-sm leading-relaxed text-neutral-700 whitespace-pre-line break-words dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-300">
+          <div className="rounded-2xl border border-neutral-200/80 bg-white/95 p-4 sm:p-5 shadow-2xs transition-all dark:border-neutral-800/80 dark:bg-neutral-900/80 backdrop-blur-xs text-sm leading-relaxed text-neutral-700 whitespace-pre-line break-words dark:text-neutral-300">
             {formatDescriptionText(description).map((seg, i) =>
               seg.type === 'link' ? (
                 <a
