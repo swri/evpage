@@ -46,7 +46,7 @@ import {
 import confetti from 'canvas-confetti';
 import { RegistrationFormSkeleton } from '@/components/ui/skeleton';
 import { PROOF_ACCEPT, storePaymentProof, validateProofFile, deletePaymentProof } from '@/lib/payment-proof';
-import { linkifyText } from '@/lib/links';
+import { formatDescriptionText } from '@/lib/links';
 
 /** Empty answers matching the form schema (repeaters start with their minimum rows). */
 function initialAnswersFor(evt: EventItem | null): Record<string, unknown> {
@@ -712,7 +712,7 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
               {event.description && (
                 <div className="mt-6 prose prose-neutral dark:prose-invert max-w-none text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-line break-words leading-relaxed bg-neutral-50/60 dark:bg-neutral-900/60 p-4 rounded-xl border border-neutral-200/60 dark:border-neutral-800">
                   {/* http(s) URLs written by the organizer become clickable links */}
-                  {linkifyText(event.description).map((seg, i) =>
+                  {formatDescriptionText(event.description).map((seg, i) =>
                     seg.type === 'link' ? (
                       <a
                         key={i}
@@ -723,6 +723,10 @@ export function EventRegistrationClient({ slug, preloaded, initialEvent, initial
                       >
                         {seg.value}
                       </a>
+                    ) : seg.type === 'bold' ? (
+                      <strong key={i} className="font-bold text-neutral-900 dark:text-neutral-100">
+                        {seg.value}
+                      </strong>
                     ) : (
                       <React.Fragment key={i}>{seg.value}</React.Fragment>
                     )

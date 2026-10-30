@@ -4,6 +4,11 @@
 
 export type TextSegment = { type: 'text'; value: string } | { type: 'link'; value: string; href: string };
 
+export type FormattedTextSegment =
+  | { type: 'text'; value: string }
+  | { type: 'bold'; value: string }
+  | { type: 'link'; value: string; href: string };
+
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 // Punctuation that usually ends a sentence rather than the URL
 const TRAILING = /[.,;:!?)\]}'"]+$/;
@@ -26,6 +31,48 @@ export function linkifyText(text: string): TextSegment[] {
   }
   if (last < text.length) segments.push({ type: 'text', value: text.slice(last) });
   return segments;
+}
+
+// Regex for bold text: Markdown standard **bold** or WhatsApp standard *bold*.
+// Group 2: content inside **...**
+// Group 3: content inside *...*
+const BOLD_PATTERN = /(\*\*([^\s*](?:[^*\n]*?[^\s*])?)\*\*|\*([^\s*](?:[^*\n]*?[^\s*])?)\*)/g;
+
+/**
+ * Splits organizer description into plain text, bold segments (**text** or *text*),
+ * and clickable http(s) links. Arithmetic or non-paired asterisks remain plain text.
+ */
+export function formatDescriptionText(text: string): FormattedTextSegment[] {
+  if (!text) return [];
+  const linkSegments = linkifyText(text);
+  const result: FormattedTextSegment[] = [];
+
+  for (const seg of linkSegments) {
+    if (seg.type === 'link') {
+      result.push(seg);
+      continue;
+    }
+
+    let last = 0;
+    for (const match of seg.value.matchAll(BOLD_PATTERN)) {
+      const start = match.index ?? 0;
+      const full = match[0];
+      const boldContent = match[2] || match[3];
+
+      if (start > last) {
+        result.push({ type: 'text', value: seg.value.slice(last, start) });
+      }
+      if (boldContent) {
+        result.push({ type: 'bold', value: boldContent });
+      }
+      last = start + full.length;
+    }
+    if (last < seg.value.length) {
+      result.push({ type: 'text', value: seg.value.slice(last) });
+    }
+  }
+
+  return result;
 }
 
 /** True for absolute http(s) URLs (what the builder accepts as a location link). */

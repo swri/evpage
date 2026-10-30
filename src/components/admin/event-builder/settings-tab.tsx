@@ -8,7 +8,7 @@ import { ImageUploadField } from '@/components/ui/image-upload-field';
 import { listEventTypes, resolveEventType } from '@/lib/event-types';
 import { formatRupiah } from '@/lib/utils';
 import { DEFAULT_TEMPLATES, NOTIFICATION_KINDS, TEMPLATE_VARIABLES } from '@/lib/notifications';
-import { Building2, User, PenLine } from 'lucide-react';
+import { Building2, User, PenLine, Bold } from 'lucide-react';
 import { InfoCardId } from '@/lib/info-cards';
 import { CardOrderManager } from './card-order-manager';
 
@@ -119,6 +119,49 @@ export function SettingsTab({
   const isOrgActive = Boolean(orgNameClean && currentClean === orgNameClean);
   const isUserActive = Boolean(userNameClean && currentClean === userNameClean);
   const isCustomActive = !isOrgActive && !isUserActive;
+  const descriptionTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const handleInsertBold = () => {
+    const el = descriptionTextareaRef.current;
+    if (!el) {
+      setDescription(description ? `${description} **teks tebal**` : '**teks tebal**');
+      return;
+    }
+
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
+    const selected = description.slice(start, end);
+
+    let newText: string;
+    let newStart: number;
+    let newEnd: number;
+
+    if (selected.length > 0) {
+      if (selected.startsWith('**') && selected.endsWith('**') && selected.length >= 4) {
+        const unwrapped = selected.slice(2, -2);
+        newText = description.slice(0, start) + unwrapped + description.slice(end);
+        newStart = start;
+        newEnd = start + unwrapped.length;
+      } else {
+        const wrapped = `**${selected}**`;
+        newText = description.slice(0, start) + wrapped + description.slice(end);
+        newStart = start;
+        newEnd = start + wrapped.length;
+      }
+    } else {
+      const placeholder = '**teks tebal**';
+      newText = description.slice(0, start) + placeholder + description.slice(end);
+      newStart = start + 2;
+      newEnd = start + 12;
+    }
+
+    setDescription(newText);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(newStart, newEnd);
+    });
+  };
+
   return (
     <div className="rounded-xl border border-neutral-200/90 bg-white p-6 shadow-xs dark:border-neutral-800 dark:bg-neutral-900 space-y-6 animate-in fade-in">
       <div className="border-b border-neutral-200 pb-3 dark:border-neutral-800">
@@ -177,10 +220,22 @@ export function SettingsTab({
 
         {/* Description / Deskripsi Event */}
         <div className="md:col-span-2">
-          <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-            Deskripsi Event (Informasi Acara / Teks Panjang)
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+              Deskripsi Event (Informasi Acara / Teks Panjang)
+            </label>
+            <button
+              type="button"
+              onClick={handleInsertBold}
+              className="inline-flex items-center gap-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-750 px-2 py-0.5 text-[11px] font-semibold text-neutral-700 dark:text-neutral-200 shadow-2xs transition-colors cursor-pointer"
+              title="Tebalkan teks yang diseleksi atau tambahkan format bold (**teks**)"
+            >
+              <Bold className="h-3 w-3 stroke-[2.5]" />
+              <span>Tebalkan Teks (Bold)</span>
+            </button>
+          </div>
           <Textarea
+            ref={descriptionTextareaRef}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Tuliskan detail jadwal, dresscode, tata tertib, hadiah, link WhatsApp grup/maps, atau pesan sambutan peserta..."
@@ -188,7 +243,7 @@ export function SettingsTab({
             className="text-xs leading-relaxed"
           />
           <span className="text-[11px] text-neutral-400 mt-1 block">
-            Ditampilkan di card utama halaman pendaftaran publik. Teks mendukung banyak baris (paragraf) dan link (https://...) otomatis dapat diklik.
+            Ditampilkan di card utama halaman pendaftaran publik. Teks mendukung format tebal (<code className="font-mono text-neutral-600 dark:text-neutral-300">*teks*</code> atau <code className="font-mono text-neutral-600 dark:text-neutral-300">**teks**</code>) dan link (<code className="font-mono text-neutral-600 dark:text-neutral-300">https://...</code>) otomatis dapat diklik.
           </span>
         </div>
 

@@ -9,6 +9,7 @@ import { formatRupiah, fromWIBDateTimeInput } from '@/lib/utils';
 import { Eye } from 'lucide-react';
 import { EventInfoCards } from '@/components/event/event-info-cards';
 import { InfoCardId, DEFAULT_CARD_ORDER } from '@/lib/info-cards';
+import { formatDescriptionText } from '@/lib/links';
 
 interface PreviewTabProps {
   coverUrl: string;
@@ -109,8 +110,26 @@ export function PreviewTab({
         </div>
 
         {description && (
-          <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/60 p-4 text-xs leading-relaxed text-neutral-700 whitespace-pre-line break-words dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-300">
-            {description}
+          <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/60 p-4 text-sm leading-relaxed text-neutral-700 whitespace-pre-line break-words dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-300">
+            {formatDescriptionText(description).map((seg, i) =>
+              seg.type === 'link' ? (
+                <a
+                  key={i}
+                  href={seg.href}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  {seg.value}
+                </a>
+              ) : seg.type === 'bold' ? (
+                <strong key={i} className="font-bold text-neutral-900 dark:text-neutral-100">
+                  {seg.value}
+                </strong>
+              ) : (
+                <React.Fragment key={i}>{seg.value}</React.Fragment>
+              )
+            )}
           </div>
         )}
 
